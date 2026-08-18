@@ -1,0 +1,70 @@
+---
+export const prerender = true;
+import Layout from '../layouts/Layout.astro';
+import Card from '../components/ui/Card.astro';
+---
+
+<Layout title="How it works — Recipe Nutrition Calculator">
+	<section class="max-w-[760px] mx-auto px-md sm:px-lg py-3xl space-y-lg">
+		<div>
+			<h1 class="text-display-lg text-ink mb-sm">How it works</h1>
+			<p class="text-body-md text-body">
+				We'd rather be transparent about how the numbers are calculated than pretend they're more precise
+				than they are.
+			</p>
+		</div>
+
+		<Card variant="marketing">
+			<h2 class="text-display-sm text-ink mb-xs">Where the nutrition data comes from</h2>
+			<p class="text-body-md text-body">
+				Nutrition values come from a curated database of common ingredients, built from public-domain USDA
+				reference data. It's not a live lookup against the full USDA database — it's a focused set covering
+				the ingredients that show up in the vast majority of home recipes. If an ingredient isn't in our
+				database, we fall back to a generic estimate and flag it clearly as{' '}
+				<strong>approximate</strong> rather than guessing silently.
+			</p>
+		</Card>
+
+		<Card variant="marketing">
+			<h2 class="text-display-sm text-ink mb-xs">How we parse your recipe</h2>
+			<p class="text-body-md text-body">
+				Pasted text (and photo transcriptions) are split into ingredient lines and parsed for quantity, unit,
+				and ingredient name — handling fractions, ranges, and common unit abbreviations. Each ingredient name
+				is then matched against our database using word-overlap scoring. A low-confidence match is shown as{' '}
+				<strong>low-confidence</strong> on the ingredient line so you know to double-check it. If an ingredient
+				isn't in our database at all, we ask an AI model for a best-guess estimate rather than skipping it —
+				those lines are clearly marked <strong>AI-estimated</strong>, since that number isn't sourced from
+				verified nutrition data.
+			</p>
+		</Card>
+
+		<Card variant="marketing">
+			<h2 class="text-display-sm text-ink mb-xs">How units convert to grams</h2>
+			<p class="text-body-md text-body">
+				Weight units (grams, ounces, pounds) convert directly. Volume units (cups, tablespoons) use an
+				ingredient-specific density where we have one — flour and water don't weigh the same per cup — and
+				count units ("2 eggs", "1 onion") use an average weight for that ingredient where known. When we
+				don't have ingredient-specific data, we fall back to water's density for volume or a generic
+				per-item weight for counts, and mark that line <strong>approximate</strong>.
+			</p>
+		</Card>
+
+		<Card variant="marketing">
+			<h2 class="text-display-sm text-ink mb-xs">URL import</h2>
+			<p class="text-body-md text-body">
+				We look for the structured "Recipe" data (schema.org JSON-LD) that most recipe sites embed for
+				Google's recipe search results. If a site doesn't publish that data, URL import won't work for it —
+				paste the ingredients directly instead.
+			</p>
+		</Card>
+
+		<Card variant="marketing">
+			<h2 class="text-display-sm text-ink mb-xs">The health score</h2>
+			<p class="text-body-md text-body">
+				A simple, transparent 1–10 score starting at 5: it goes down for high sodium, saturated fat, or sugar
+				per serving (over 20% of the daily value), and up for a good source of fiber or protein (over 15–20%
+				of the daily value). It's a rough signal, not a clinical assessment.
+			</p>
+		</Card>
+	</section>
+</Layout>

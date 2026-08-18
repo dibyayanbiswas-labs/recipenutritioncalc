@@ -1,0 +1,23 @@
+---
+import Badge from '../ui/Badge.astro';
+import { ALLERGEN_LABELS } from '../../lib/allergens';
+
+interface Props {
+	allergens: string[];
+}
+
+const { allergens } = Astro.props;
+---
+
+{
+	allergens.length > 0 && (
+		<div>
+			<p class="text-body-sm-strong text-ink mb-xxs">Contains</p>
+			<div class="flex flex-wrap gap-xxs">
+				{allergens.map((a) => (
+					<Badge tone="warning">{ALLERGEN_LABELS[a] ?? a}</Badge>
+				))}
+			</div>
+		</div>
+	)
+}

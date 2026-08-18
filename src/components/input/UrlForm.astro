@@ -1,0 +1,54 @@
+---
+import { actions } from 'astro:actions';
+import Input from '../ui/Input.astro';
+import Button from '../ui/Button.astro';
+
+interface Props {
+	error?: string | null;
+	value?: string;
+}
+
+const { error = null, value = '' } = Astro.props;
+---
+
+<form method="POST" action={actions.analyzeUrl} class="space-y-md">
+	<div>
+		<label for="recipe-url" class="text-body-sm-strong text-ink block mb-xxs">Recipe URL</label>
+		<Input id="recipe-url" name="url" type="url" required placeholder="https://example.com/my-recipe" value={value} />
+		{error && <p class="text-body-sm text-error-deep mt-xxs">{error}</p>}
+		<p class="text-caption text-mute mt-xxs">
+			We look for the structured recipe data most recipe sites embed. If a site doesn't have it, try pasting
+			the ingredients instead.
+		</p>
+	</div>
+	<div class="max-w-[200px]">
+		<label for="url-servings" class="text-body-sm-strong text-ink block mb-xxs">Servings override (optional)</label>
+		<Input id="url-servings" name="servingsOverride" type="number" placeholder="Auto-detected" />
+	</div>
+	<div class="flex items-center gap-md">
+		<Button type="submit">Fetch &amp; calculate</Button>
+		<button type="button" id="url-start-over" class="text-body-sm-strong text-link hover:underline">Start over</button>
+	</div>
+</form>
+
+<script>
+	import { startOver } from '../../lib/clearSavedInputs';
+
+	document.getElementById('url-start-over')?.addEventListener('click', () => startOver());
+
+	const fields = [
+		{ id: 'recipe-url', key: 'recipeCalc:url' },
+		{ id: 'url-servings', key: 'recipeCalc:urlServings' },
+	];
+	fields.forEach((f) => {
+		const el = document.getElementById(f.id) as HTMLInputElement | null;
+		if (!el) return;
+		if (!el.value) {
+			const saved = sessionStorage.getItem(f.key);
+			if (saved) el.value = saved;
+		}
+		el.addEventListener('input', () => {
+			sessionStorage.setItem(f.key, el.value);
+		});
+	});
+</script>

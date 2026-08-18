@@ -1,0 +1,39 @@
+---
+import type { NutrientProfile } from '../../lib/matchIngredient';
+import { MICRO_META } from '../../lib/nutrientMeta';
+import DVBar from './DVBar.astro';
+
+interface Props {
+	perServing: NutrientProfile;
+	dailyValuePercent: Record<string, number>;
+}
+
+const { perServing, dailyValuePercent } = Astro.props;
+
+// Split into two column-ordered halves rather than letting the grid auto-flow row by row, so each
+// column can carry its own divide-y — a horizontal rule between rows only reads correctly when the
+// rows above and below it belong to the same column.
+const mid = Math.ceil(MICRO_META.length / 2);
+const columns = [MICRO_META.slice(0, mid), MICRO_META.slice(mid)];
+---
+
+<div>
+	<p class="text-body-sm-strong text-ink mb-sm">Vitamins &amp; minerals (per serving, % Daily Value)</p>
+	<div class="grid sm:grid-cols-2 gap-x-xl">
+		{
+			columns.map((column) => (
+				<div class="sm:divide-y sm:divide-hairline">
+					{column.map((m) => (
+						<DVBar
+							label={m.label}
+							value={perServing[m.key as keyof NutrientProfile] ?? 0}
+							unit={m.unit}
+							percent={dailyValuePercent[m.key] ?? 0}
+							nutrientKey={m.key}
+						/>
+					))}
+				</div>
+			))
+		}
+	</div>
+</div>

@@ -1,0 +1,29 @@
+---
+export const prerender = true;
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Privacy — Recipe Nutrition Calculator">
+	<section class="max-w-[720px] mx-auto px-md sm:px-lg py-3xl">
+		<h1 class="text-display-lg text-ink mb-lg">Privacy</h1>
+		<div class="space-y-md text-body-md text-body">
+			<p>We don't require an account, so we don't collect names, emails, or passwords for using the calculator.</p>
+			<p>
+				When you analyze a recipe, the ingredient text (and, for photo uploads, the image itself, transiently)
+				is processed to compute nutrition data. The resulting nutrition analysis is stored so that its
+				share link works, and is kept for up to 90 days. Photos are used only to transcribe text and are not
+				retained after processing.
+			</p>
+			<p>
+				When you paste a URL, we fetch that page's content server-side to look for its structured recipe data.
+				We don't store the fetched page itself.
+			</p>
+			<p>
+				Share links are public to anyone who has the link — they are not searchable or listed publicly, but
+				treat them like any other unlisted link: don't share ones containing information you'd rather keep
+				private.
+			</p>
+			<p>We don't sell data or share it with third parties for advertising.</p>
+		</div>
+	</section>
+</Layout>

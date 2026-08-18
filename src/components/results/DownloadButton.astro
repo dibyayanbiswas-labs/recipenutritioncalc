@@ -1,0 +1,38 @@
+---
+interface Props {
+	title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<button
+	id="download-button"
+	type="button"
+	data-title={title}
+	class="inline-flex items-center gap-xs text-button-md rounded-pill h-9 px-sm bg-canvas text-ink border border-hairline hover:bg-canvas-soft-2 disabled:opacity-50"
+>
+	Download PDF
+</button>
+
+<script>
+	import { exportElementAsPdf } from '../../lib/exportPdf';
+	import { slugifyTitle } from '../../lib/slug';
+
+	const btn = document.getElementById('download-button') as HTMLButtonElement | null;
+
+	btn?.addEventListener('click', async () => {
+		const title = btn.dataset.title || 'recipe';
+		const originalLabel = btn.textContent;
+		btn.textContent = 'Preparing PDF…';
+		btn.disabled = true;
+		try {
+			await exportElementAsPdf('results-root', `${slugifyTitle(title)}-nutrition`);
+		} catch (err) {
+			console.error('PDF export failed', err);
+		} finally {
+			btn.textContent = originalLabel;
+			btn.disabled = false;
+		}
+	});
+</script>

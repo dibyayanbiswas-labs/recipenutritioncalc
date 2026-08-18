@@ -1,0 +1,116 @@
+---
+import Input from '../ui/Input.astro';
+import Button from '../ui/Button.astro';
+---
+
+<form id="manual-form" class="space-y-md">
+	<div class="grid sm:grid-cols-[1fr_140px] gap-sm">
+		<div>
+			<label for="manual-title" class="text-body-sm-strong text-ink block mb-xxs">Recipe name (optional)</label>
+			<Input id="manual-title" name="title" placeholder="e.g. Weeknight chicken curry" />
+		</div>
+		<div>
+			<label for="manual-servings" class="text-body-sm-strong text-ink block mb-xxs">Servings</label>
+			<Input id="manual-servings" name="servings" type="number" value="4" />
+		</div>
+	</div>
+
+	<div id="manual-rows" class="space-y-xs">
+		<div class="grid grid-cols-[80px_100px_1fr_36px] gap-xs items-center" data-row>
+			<Input name="quantity" placeholder="2" />
+			<Input name="unit" placeholder="cups" />
+			<Input name="name" placeholder="all-purpose flour" />
+			<button type="button" data-remove-row class="text-mute hover:text-error-deep text-body-sm" aria-label="Remove row"
+				>&times;</button
+			>
+		</div>
+	</div>
+
+	<button type="button" id="add-row" class="text-body-sm-strong text-link hover:underline">+ Add ingredient</button>
+
+	<p id="manual-error" class="text-body-sm text-error-deep hidden"></p>
+
+	<div class="flex items-center gap-md">
+		<Button type="button" id="manual-submit">Calculate nutrition</Button>
+		<button type="button" id="manual-start-over" class="text-body-sm-strong text-link hover:underline">Start over</button>
+	</div>
+</form>
+
+<template id="row-template">
+	<div class="grid grid-cols-[80px_100px_1fr_36px] gap-xs items-center" data-row>
+		<input
+			name="quantity"
+			placeholder="2"
+			class="w-full h-10 bg-canvas text-ink border border-hairline rounded-sm px-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-link"
+		/>
+		<input
+			name="unit"
+			placeholder="cups"
+			class="w-full h-10 bg-canvas text-ink border border-hairline rounded-sm px-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-link"
+		/>
+		<input
+			name="name"
+			placeholder="all-purpose flour"
+			class="w-full h-10 bg-canvas text-ink border border-hairline rounded-sm px-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-link"
+		/>
+		<button type="button" data-remove-row class="text-mute hover:text-error-deep text-body-sm" aria-label="Remove row"
+			>&times;</button
+		>
+	</div>
+</template>
+
+<script>
+	import { actions } from 'astro:actions';
+	import { startOver } from '../../lib/clearSavedInputs';
+
+	document.getElementById('manual-start-over')?.addEventListener('click', () => startOver());
+
+	const rowsContainer = document.getElementById('manual-rows')!;
+	const template = document.getElementById('row-template') as HTMLTemplateElement;
+	const addRowBtn = document.getElementById('add-row')!;
+	const submitBtn = document.getElementById('manual-submit')!;
+	const errorEl = document.getElementById('manual-error')!;
+	const form = document.getElementById('manual-form') as HTMLFormElement;
+
+	addRowBtn.addEventListener('click', () => {
+		const clone = template.content.cloneNode(true) as DocumentFragment;
+		rowsContainer.appendChild(clone);
+	});
+
+	rowsContainer.addEventListener('click', (e) => {
+		const target = e.target as HTMLElement;
+		if (target.matches('[data-remove-row]')) {
+			const row = target.closest('[data-row]');
+			if (rowsContainer.querySelectorAll('[data-row]').length > 1) {
+				row?.remove();
+			}
+		}
+	});
+
+	submitBtn.addEventListener('click', async () => {
+		errorEl.classList.add('hidden');
+		const formData = new FormData(form);
+		const rows = Array.from(rowsContainer.querySelectorAll('[data-row]')).map((row) => ({
+			quantity: (row.querySelector('[name="quantity"]') as HTMLInputElement)?.value ?? '',
+			unit: (row.querySelector('[name="unit"]') as HTMLInputElement)?.value ?? '',
+			name: (row.querySelector('[name="name"]') as HTMLInputElement)?.value ?? '',
+		}));
+
+		submitBtn.setAttribute('disabled', 'true');
+		const { data, error } = await actions.analyzeManual({
+			title: formData.get('title')?.toString(),
+			servings: Number(formData.get('servings')) || 4,
+			rows,
+		});
+		submitBtn.removeAttribute('disabled');
+
+		if (error) {
+			errorEl.textContent = error.message;
+			errorEl.classList.remove('hidden');
+			return;
+		}
+		if (data) {
+			window.location.href = `/r/${data.id}`;
+		}
+	});
+</script>

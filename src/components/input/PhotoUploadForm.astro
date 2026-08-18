@@ -1,0 +1,72 @@
+---
+import Button from '../ui/Button.astro';
+---
+
+<form id="photo-form" class="space-y-md">
+	<div>
+		<label for="photo-input" class="text-body-sm-strong text-ink block mb-xxs">Upload a photo of the recipe</label>
+		<input
+			id="photo-input"
+			name="image"
+			type="file"
+			accept="image/*"
+			required
+			class="w-full text-body-sm text-body file:mr-sm file:h-9 file:px-sm file:rounded-pill file:border-0 file:bg-primary file:text-on-primary file:text-button-md"
+		/>
+		<p class="text-caption text-mute mt-xxs">
+			Printed text works best. We'll show you the transcribed ingredients to review and correct before
+			calculating, in case anything gets misread.
+		</p>
+	</div>
+	<p id="photo-error" class="text-body-sm text-error-deep hidden"></p>
+	<Button type="button" id="photo-submit">Transcribe photo</Button>
+</form>
+
+<script>
+	import { actions } from 'astro:actions';
+
+	declare global {
+		interface Window {
+			activateInputTab?: (tab: string) => void;
+		}
+	}
+
+	const fileInput = document.getElementById('photo-input') as HTMLInputElement;
+	const submitBtn = document.getElementById('photo-submit') as HTMLButtonElement;
+	const errorEl = document.getElementById('photo-error')!;
+
+	submitBtn.addEventListener('click', async () => {
+		errorEl.classList.add('hidden');
+		const file = fileInput.files?.[0];
+		if (!file) {
+			errorEl.textContent = 'Choose a photo first.';
+			errorEl.classList.remove('hidden');
+			return;
+		}
+
+		const originalLabel = submitBtn.textContent;
+		submitBtn.textContent = 'Reading photo…';
+		submitBtn.setAttribute('disabled', 'true');
+
+		const formData = new FormData();
+		formData.set('image', file);
+		const { data, error } = await actions.transcribeImage(formData);
+
+		submitBtn.textContent = originalLabel;
+		submitBtn.removeAttribute('disabled');
+
+		if (error) {
+			errorEl.textContent = error.message;
+			errorEl.classList.remove('hidden');
+			return;
+		}
+
+		if (data) {
+			const textarea = document.getElementById('ingredient-textarea') as HTMLTextAreaElement | null;
+			if (textarea) {
+				textarea.value = data.text;
+			}
+			window.activateInputTab?.('paste');
+		}
+	});
+</script>

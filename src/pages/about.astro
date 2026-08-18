@@ -1,0 +1,25 @@
+---
+export const prerender = true;
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="About — Recipe Nutrition Calculator">
+	<section class="max-w-[720px] mx-auto px-md sm:px-lg py-3xl">
+		<h1 class="text-display-lg text-ink mb-lg">About</h1>
+		<div class="space-y-md text-body-md text-body">
+			<p>
+				Recipe Nutrition Calculator exists because the tools we tried either buried the useful detail behind a
+				paywall, or made you create an account just to see or share a result. We wanted something that gives
+				you the full picture — calories, macros, and micronutrients — for free, instantly, with no login.
+			</p>
+			<p>
+				Every recipe you analyze gets a shareable link automatically. Nothing is tied to an account, because
+				there are no accounts.
+			</p>
+			<p>
+				See <a href="/how-it-works" class="text-link hover:underline">how it works</a> for details on where the
+				nutrition data comes from and how we handle ingredients we can't match exactly.
+			</p>
+		</div>
+	</section>
+</Layout>

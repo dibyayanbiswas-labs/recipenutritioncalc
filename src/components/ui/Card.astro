@@ -1,0 +1,20 @@
+---
+interface Props {
+	variant?: 'marketing' | 'marketing-large' | 'soft';
+	class?: string;
+}
+
+const { variant = 'marketing', class: className } = Astro.props;
+
+const variants = {
+	marketing: 'bg-canvas text-ink rounded-md p-lg shadow-elevation-3',
+	'marketing-large': 'bg-canvas text-ink rounded-lg p-xl shadow-elevation-4',
+	soft: 'bg-canvas-soft text-ink rounded-md p-lg',
+};
+
+const classes = [variants[variant], className].filter(Boolean).join(' ');
+---
+
+<div class={classes}>
+	<slot />
+</div>

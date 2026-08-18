@@ -1,0 +1,34 @@
+---
+interface Props {
+	resultId: string;
+}
+
+const { resultId } = Astro.props;
+---
+
+<button
+	id="share-button"
+	data-result-id={resultId}
+	type="button"
+	class="inline-flex items-center gap-xs text-button-md rounded-pill h-9 px-sm bg-canvas text-ink border border-hairline hover:bg-canvas-soft-2"
+>
+	<span id="share-button-label">Copy share link</span>
+</button>
+
+<script>
+	document.getElementById('share-button')?.addEventListener('click', async (e) => {
+		const btn = e.currentTarget as HTMLButtonElement;
+		const id = btn.dataset.resultId;
+		const url = `${window.location.origin}/r/${id}`;
+		const label = document.getElementById('share-button-label')!;
+		try {
+			await navigator.clipboard.writeText(url);
+			label.textContent = 'Link copied!';
+		} catch {
+			label.textContent = url;
+		}
+		setTimeout(() => {
+			label.textContent = 'Copy share link';
+		}, 2000);
+	});
+</script>

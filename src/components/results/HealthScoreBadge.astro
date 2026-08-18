@@ -1,0 +1,23 @@
+---
+import type { HealthScore } from '../../lib/nutrients';
+
+interface Props {
+	healthScore: HealthScore;
+}
+
+const { healthScore } = Astro.props;
+const tone = healthScore.score >= 7 ? 'bg-accent text-white' : healthScore.score >= 4 ? 'bg-warning text-ink' : 'bg-error text-white';
+---
+
+<div class="flex items-center gap-md" data-health-score-root>
+	<div class={`size-16 rounded-full flex flex-col items-center justify-center shrink-0 ${tone}`} data-health-circle>
+		<span class="text-display-sm leading-none" data-health-score>{healthScore.score}</span>
+		<span class="text-caption opacity-80">/10</span>
+	</div>
+	<div>
+		<p class="text-body-md-strong text-ink">Health score</p>
+		<ul class="text-body-sm text-mute list-disc list-inside space-y-xxs mt-xxs" data-health-rationale>
+			{healthScore.rationale.map((r: string) => <li>{r}</li>)}
+		</ul>
+	</div>
+</div>

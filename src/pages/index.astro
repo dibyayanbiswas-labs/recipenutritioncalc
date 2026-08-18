@@ -1,11 +1,75 @@
 ---
-import Welcome from '../components/Welcome.astro';
 import Layout from '../layouts/Layout.astro';
+import Card from '../components/ui/Card.astro';
+import InputTabs from '../components/input/InputTabs.astro';
+import ResultsView from '../components/results/ResultsView.astro';
+import { actions } from 'astro:actions';
 
-// Welcome to Astro! Wondering what to do next? Check out the Astro documentation at https://docs.astro.build
-// Don't want to use any of this? Delete everything in this file, the `assets`, `components`, and `layouts` directories, and start fresh.
+const textResult = Astro.getActionResult(actions.analyzeText);
+const urlResult = Astro.getActionResult(actions.analyzeUrl);
+
+const activeTab: 'paste' | 'url' = urlResult ? 'url' : 'paste';
+const errorResult = textResult?.error ?? urlResult?.error ?? null;
+const nutritionResult = !textResult?.error && textResult?.data ? textResult.data : !urlResult?.error && urlResult?.data ? urlResult.data : null;
+
+const features = [
+	{
+		title: 'Every macro and 20+ micros',
+		body: 'Calories, protein, carbs, fat, fiber, sugar, sodium, plus vitamins and minerals with %DV — not just the six numbers most calculators stop at.',
+	},
+	{
+		title: 'No account, no paywall',
+		body: 'Paste a recipe and get results instantly. Every analysis gets a shareable link automatically — no sign-up required to save or share.',
+	},
+	{
+		title: 'Honest about estimates',
+		body: 'When we can\'t find an exact ingredient match or unit conversion, we say so — flagged right on the ingredient line, not hidden.',
+	},
+];
 ---
 
 <Layout>
-	<Welcome />
+	<section class="max-w-[1400px] mx-auto px-md sm:px-lg pt-3xl pb-2xl">
+		<div class="max-w-[720px]">
+			<span class="text-caption-mono text-mute uppercase tracking-wide">Free · No login required</span>
+			<h1 class="text-display-xl text-ink mt-xs">Know exactly what's in your recipe.</h1>
+			<p class="text-body-lg text-body mt-sm">
+				Paste a recipe, drop in a link, or snap a photo. Get calories, full macros, and 20+ micronutrients per
+				serving in seconds.
+			</p>
+		</div>
+	</section>
+
+	<section class="max-w-[1400px] mx-auto px-md sm:px-lg pb-4xl">
+		<Card variant="marketing-large">
+			<InputTabs
+				activeTab={activeTab}
+				textError={errorResult?.message ?? null}
+				urlError={urlResult?.error?.message ?? null}
+				pasteServings={!textResult?.error && textResult?.data ? textResult.data.servings : undefined}
+			/>
+		</Card>
+
+		{
+			nutritionResult && (
+				<div class="mt-2xl">
+					<ResultsView result={nutritionResult} />
+				</div>
+			)
+		}
+	</section>
+
+	<section class="max-w-[1400px] mx-auto px-md sm:px-lg pb-5xl">
+		<h2 class="text-display-lg text-ink mb-lg">Built to be more useful than the alternatives</h2>
+		<div class="grid sm:grid-cols-3 gap-lg">
+			{
+				features.map((f) => (
+					<Card variant="marketing">
+						<h3 class="text-display-sm text-ink mb-xs">{f.title}</h3>
+						<p class="text-body-md text-body">{f.body}</p>
+					</Card>
+				))
+			}
+		</div>
+	</section>
 </Layout>

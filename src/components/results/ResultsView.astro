@@ -1,0 +1,219 @@
+---
+import type { NutritionResult } from '../../lib/nutrients';
+import Card from '../ui/Card.astro';
+import MacroSummary from './MacroSummary.astro';
+import MicronutrientTable from './MicronutrientTable.astro';
+import HealthScoreBadge from './HealthScoreBadge.astro';
+import AllergenTags from './AllergenTags.astro';
+import IngredientBreakdown from './IngredientBreakdown.astro';
+import NutritionLabelExport from './NutritionLabelExport.astro';
+import ShareButton from './ShareButton.astro';
+import DownloadButton from './DownloadButton.astro';
+
+interface Props {
+	result: NutritionResult;
+	showShare?: boolean;
+}
+
+const { result, showShare = true } = Astro.props;
+const totalsJson = JSON.stringify(result.totals).replace(/</g, '\\u003c');
+---
+
+<div class="space-y-lg" id="results-root">
+	<div class="flex flex-wrap items-start justify-between gap-md">
+		<div>
+			<h2 class="text-display-md text-ink">{result.title}</h2>
+			<p class="text-body-sm text-mute mt-xxs">
+				<span data-servings-count>{result.servings}</span> servings
+				{result.sourceUrl && (
+					<>
+						{' '}
+						· imported from <a href={result.sourceUrl} class="text-link hover:underline">source</a>
+					</>
+				)}
+			</p>
+		</div>
+
+		<div class="flex flex-wrap items-center gap-sm" data-print-hide>
+			<div class="flex items-center gap-xs">
+				<span class="text-body-sm-strong text-ink">Servings</span>
+				<div class="flex items-center border border-hairline rounded-pill-sm overflow-hidden bg-canvas">
+					<button
+						type="button"
+						id="servings-decrement"
+						class="w-9 h-9 flex items-center justify-center text-ink hover:bg-canvas-soft-2 text-body-md-strong"
+						aria-label="Decrease servings"
+					>
+						&minus;
+					</button>
+					<input
+						id="servings-input"
+						type="number"
+						min="1"
+						max="100"
+						step="1"
+						value={result.servings}
+						class="w-14 h-9 text-center text-body-sm-strong text-ink bg-canvas focus:outline-none"
+						aria-label="Number of servings"
+					/>
+					<button
+						type="button"
+						id="servings-increment"
+						class="w-9 h-9 flex items-center justify-center text-ink hover:bg-canvas-soft-2 text-body-md-strong"
+						aria-label="Increase servings"
+					>
+						+
+					</button>
+				</div>
+			</div>
+
+			{
+				showShare && (
+					<div class="flex items-center gap-xs shrink-0">
+						<ShareButton resultId={result.id} />
+						<DownloadButton title={result.title} />
+					</div>
+				)
+			}
+		</div>
+	</div>
+
+	<Card variant="marketing">
+		<HealthScoreBadge healthScore={result.healthScore} />
+		{
+			result.allergens.length > 0 && (
+				<div class="mt-md pt-md border-t border-hairline">
+					<AllergenTags allergens={result.allergens} />
+				</div>
+			)
+		}
+	</Card>
+
+	<Card variant="marketing">
+		<MacroSummary perServing={result.perServing} dailyValuePercent={result.dailyValuePercent} />
+		<div class="border-t border-hairline my-lg"></div>
+		<MicronutrientTable perServing={result.perServing} dailyValuePercent={result.dailyValuePercent} />
+	</Card>
+
+	<Card variant="marketing">
+		<IngredientBreakdown ingredients={result.ingredients} />
+	</Card>
+
+	<details class="group">
+		<summary class="text-body-sm-strong text-link cursor-pointer hover:underline" data-print-hide>Show printable label</summary>
+		<div class="mt-md flex justify-center">
+			<div class="bg-canvas-soft rounded-lg p-lg">
+				<NutritionLabelExport result={result} />
+			</div>
+		</div>
+	</details>
+</div>
+
+<script type="application/json" id="nutrition-totals-data" set:html={totalsJson} is:inline />
+
+<script>
+	import { recomputeForServings, MACRO_META, MICRO_META, type NutrientProfile } from '../../lib/clientNutrition';
+
+	const ALL_META = [...MACRO_META, ...MICRO_META];
+	const MACRO_KEYS = new Set(MACRO_META.map((m) => m.key));
+
+	const totalsEl = document.getElementById('nutrition-totals-data');
+	const totals = totalsEl?.textContent ? (JSON.parse(totalsEl.textContent) as NutrientProfile) : null;
+
+	const input = document.getElementById('servings-input') as HTMLInputElement | null;
+	const decBtn = document.getElementById('servings-decrement');
+	const incBtn = document.getElementById('servings-increment');
+
+	const TONE_CLASSES: Record<'good' | 'mid' | 'low', string[]> = {
+		good: ['bg-accent', 'text-white'],
+		mid: ['bg-warning', 'text-ink'],
+		low: ['bg-error', 'text-white'],
+	};
+	function toneFor(score: number): 'good' | 'mid' | 'low' {
+		return score >= 7 ? 'good' : score >= 4 ? 'mid' : 'low';
+	}
+	function applyTone(el: Element, tone: 'good' | 'mid' | 'low') {
+		Object.values(TONE_CLASSES)
+			.flat()
+			.forEach((c) => el.classList.remove(c));
+		TONE_CLASSES[tone].forEach((c) => el.classList.add(c));
+	}
+
+	function applyResult(next: ReturnType<typeof recomputeForServings>) {
+		const { servings, perServing, dailyValuePercent, healthScore } = next;
+
+		document.querySelectorAll('[data-servings-count]').forEach((el) => (el.textContent = String(servings)));
+		const labelServings = document.querySelector('[data-label-servings]');
+		if (labelServings) labelServings.textContent = `${servings} servings per recipe`;
+
+		const kcal = String(Math.round(perServing.kcal ?? 0));
+		document.querySelectorAll('[data-kcal-value]').forEach((el) => (el.textContent = kcal));
+		const labelKcal = document.querySelector('[data-label-kcal]');
+		if (labelKcal) labelKcal.textContent = kcal;
+
+		document.querySelectorAll('[data-macro-cell]').forEach((cell) => {
+			const key = (cell as HTMLElement).dataset.key;
+			const meta = MACRO_META.find((m) => m.key === key);
+			const valueEl = cell.querySelector('[data-macro-value]');
+			if (valueEl && meta && key) valueEl.textContent = `${perServing[key as keyof NutrientProfile] ?? 0}${meta.unit}`;
+		});
+
+		document.querySelectorAll('[data-nutrient-row]').forEach((row) => {
+			const key = (row as HTMLElement).dataset.key;
+			const meta = ALL_META.find((m) => m.key === key);
+			if (!meta || !key) return;
+			const percent = dailyValuePercent[key] ?? 0;
+			const clamped = Math.min(100, Math.max(0, percent));
+			const valueEl = row.querySelector('[data-bar-value]');
+			const percentEl = row.querySelector('[data-bar-percent]');
+			const fillEl = row.querySelector('[data-bar-fill]') as HTMLElement | null;
+			if (valueEl) valueEl.textContent = `${perServing[key as keyof NutrientProfile] ?? 0}${meta.unit}`;
+			if (percentEl) percentEl.textContent = `${percent}%`;
+			if (fillEl) fillEl.style.width = `${clamped}%`;
+		});
+
+		document.querySelectorAll('[data-label-row]').forEach((row) => {
+			const key = (row as HTMLElement).dataset.key;
+			if (!key) return;
+			if (MACRO_KEYS.has(key)) {
+				const meta = MACRO_META.find((m) => m.key === key);
+				const valueEl = row.querySelector('[data-label-value]');
+				if (valueEl && meta) valueEl.textContent = `${perServing[key as keyof NutrientProfile] ?? 0}${meta.unit}`;
+				return;
+			}
+			const dv = dailyValuePercent[key] ?? 0;
+			(row as HTMLElement).hidden = dv <= 0;
+			const dvEl = row.querySelector('[data-label-dv]');
+			if (dvEl) dvEl.textContent = `${dv}% DV`;
+		});
+
+		const scoreEl = document.querySelector('[data-health-score]');
+		if (scoreEl) scoreEl.textContent = String(healthScore.score);
+		const circle = document.querySelector('[data-health-circle]');
+		if (circle) applyTone(circle, toneFor(healthScore.score));
+		const rationaleEl = document.querySelector('[data-health-rationale]');
+		if (rationaleEl) {
+			rationaleEl.innerHTML = '';
+			for (const r of healthScore.rationale) {
+				const li = document.createElement('li');
+				li.textContent = r;
+				rationaleEl.appendChild(li);
+			}
+		}
+	}
+
+	function setServings(next: number, syncInput: boolean) {
+		if (!totals || !Number.isFinite(next)) return;
+		const clamped = Math.min(100, Math.max(1, Math.round(next)));
+		if (syncInput && input) input.value = String(clamped);
+		applyResult(recomputeForServings(totals, clamped));
+	}
+
+	decBtn?.addEventListener('click', () => setServings(Number(input?.value || '1') - 1, true));
+	incBtn?.addEventListener('click', () => setServings(Number(input?.value || '1') + 1, true));
+	input?.addEventListener('input', () => {
+		const n = Number(input.value);
+		if (Number.isFinite(n) && n >= 1) setServings(n, false);
+	});
+	input?.addEventListener('change', () => setServings(Number(input.value) || 1, true));
+</script>

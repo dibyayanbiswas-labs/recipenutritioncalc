@@ -1,0 +1,23 @@
+---
+interface Props {
+	tone?: 'neutral' | 'warning' | 'error' | 'info';
+	class?: string;
+}
+
+const { tone = 'neutral', class: className } = Astro.props;
+
+const tones = {
+	neutral: 'bg-canvas-soft-2 text-body',
+	warning: 'bg-warning-soft text-warning-deep',
+	error: 'bg-error-soft text-error-deep',
+	info: 'bg-link-bg-soft text-link-deep',
+};
+
+const classes = ['inline-flex items-center rounded-full px-xs py-0.5 text-caption', tones[tone], className]
+	.filter(Boolean)
+	.join(' ');
+---
+
+<span class={classes}>
+	<slot />
+</span>

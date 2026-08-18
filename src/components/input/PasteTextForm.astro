@@ -1,0 +1,117 @@
+---
+import { actions } from 'astro:actions';
+import Input from '../ui/Input.astro';
+import Button from '../ui/Button.astro';
+
+interface Props {
+	error?: string | null;
+	value?: string;
+	title?: string;
+	servings?: number;
+}
+
+const { error = null, value = '', title = '', servings } = Astro.props;
+// Only mark the field "server-filled" when we actually have a value from a submission (success or
+// error) to show back — otherwise the client restore script is free to pull the last-typed value
+// from sessionStorage on a fresh page load.
+const servingsValue = servings ?? 4;
+const servingsPrefilled = servings !== undefined;
+---
+
+<form id="paste-form" method="POST" action={actions.analyzeText} class="space-y-md">
+	<div class="grid sm:grid-cols-[1fr_140px] gap-sm">
+		<div>
+			<label for="paste-title" class="text-body-sm-strong text-ink block mb-xxs">Recipe name (optional)</label>
+			<Input id="paste-title" name="title" placeholder="e.g. Weeknight chicken curry" value={title} />
+		</div>
+		<div>
+			<label for="paste-servings" class="text-body-sm-strong text-ink block mb-xxs">Servings</label>
+			<Input
+				id="paste-servings"
+				name="servings"
+				type="number"
+				min="1"
+				max="100"
+				step="1"
+				value={servingsValue}
+				data-prefilled={servingsPrefilled ? 'true' : 'false'}
+			/>
+		</div>
+	</div>
+
+	<div>
+		<label for="ingredient-textarea" class="text-body-sm-strong text-ink block mb-xxs"
+			>Paste your ingredients (one per line)</label
+		>
+		<textarea
+			id="ingredient-textarea"
+			name="text"
+			required
+			rows="10"
+			placeholder={'2 cups all-purpose flour\n1 tsp salt\n1/2 cup butter, softened\n2 large eggs'}
+			class="w-full bg-canvas text-ink border border-hairline rounded-sm p-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-link"
+			>{value}</textarea
+		>
+		{error && <p class="text-body-sm text-error-deep mt-xxs">{error}</p>}
+		<p id="paste-format-error" class="text-body-sm text-error-deep mt-xxs hidden"></p>
+	</div>
+
+	<div class="flex items-center gap-md">
+		<Button type="submit">Calculate nutrition</Button>
+		<button type="button" id="paste-start-over" class="text-body-sm-strong text-link hover:underline">Start over</button>
+	</div>
+</form>
+
+<script>
+	import { checkIngredientTextFormat } from '../../lib/parseIngredients';
+	import { startOver } from '../../lib/clearSavedInputs';
+
+	const form = document.getElementById('paste-form') as HTMLFormElement | null;
+	const textarea = document.getElementById('ingredient-textarea') as HTMLTextAreaElement | null;
+	const errorEl = document.getElementById('paste-format-error');
+
+	document.getElementById('paste-start-over')?.addEventListener('click', () => startOver());
+
+	form?.addEventListener('submit', (e) => {
+		if (!textarea || !errorEl) return;
+		const check = checkIngredientTextFormat(textarea.value);
+		if (!check.ok) {
+			e.preventDefault();
+			let message = check.reason ?? 'That format is hard to read.';
+			if (check.unparsedExamples?.length) {
+				message += ` We couldn't read: "${check.unparsedExamples.join('", "')}".`;
+			}
+			errorEl.textContent = message;
+			errorEl.classList.remove('hidden');
+			textarea.focus();
+		} else {
+			errorEl.classList.add('hidden');
+		}
+	});
+</script>
+
+<script is:inline>
+	(function () {
+		var fields = [
+			{ id: 'paste-title', key: 'recipeCalc:pasteTitle' },
+			{ id: 'paste-servings', key: 'recipeCalc:pasteServings' },
+			{ id: 'ingredient-textarea', key: 'recipeCalc:pasteText' },
+		];
+		fields.forEach(function (f) {
+			var el = document.getElementById(f.id);
+			if (!el) return;
+			// A field the server just filled from an actual submission (result or re-shown error) wins
+			// outright — sync sessionStorage to it instead of overwriting it with a stale saved value.
+			if (el.dataset.prefilled === 'true') {
+				sessionStorage.setItem(f.key, el.value);
+			} else if (!el.value) {
+				// Otherwise restore only into an empty field — never clobber a value the server rendered.
+				var saved = sessionStorage.getItem(f.key);
+				if (saved) el.value = saved;
+			}
+			el.addEventListener('input', function () {
+				sessionStorage.setItem(f.key, el.value);
+			});
+		});
+	})();
+</script>

@@ -1,0 +1,45 @@
+---
+import type { NutrientProfile } from '../../lib/matchIngredient';
+import { MACRO_META } from '../../lib/nutrientMeta';
+import DVBar from './DVBar.astro';
+
+interface Props {
+	perServing: NutrientProfile;
+	dailyValuePercent: Record<string, number>;
+}
+
+const { perServing, dailyValuePercent } = Astro.props;
+---
+
+<div>
+	<div class="flex items-baseline gap-xs mb-md">
+		<span class="text-display-xl text-ink" data-kcal-value>{Math.round(perServing.kcal)}</span>
+		<span class="text-body-md text-body">kcal per serving</span>
+	</div>
+	<div class="grid grid-cols-2 sm:grid-cols-4 gap-sm mb-lg">
+		{
+			MACRO_META.filter((m) => ['protein_g', 'carbs_g', 'fat_g', 'fiber_g'].includes(m.key)).map((m) => (
+				<div class="bg-canvas-soft rounded-md px-sm py-sm text-center" data-macro-cell data-key={m.key}>
+					<p class="text-caption text-mute truncate">{m.label}</p>
+					<p class="text-body-md-strong text-ink" data-macro-value>
+						{perServing[m.key as keyof NutrientProfile]}
+						{m.unit}
+					</p>
+				</div>
+			))
+		}
+	</div>
+	<div class="space-y-xxs">
+		{
+			MACRO_META.map((m) => (
+				<DVBar
+					label={m.label}
+					value={perServing[m.key as keyof NutrientProfile] ?? 0}
+					unit={m.unit}
+					percent={dailyValuePercent[m.key] ?? 0}
+					nutrientKey={m.key}
+				/>
+			))
+		}
+	</div>
+</div>

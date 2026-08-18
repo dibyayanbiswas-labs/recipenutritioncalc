@@ -1,0 +1,33 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ResultsView from '../../components/results/ResultsView.astro';
+import { loadResult } from '../../lib/kv';
+import { env } from 'cloudflare:workers';
+
+const { id } = Astro.params;
+const result = id ? await loadResult(env.RESULTS_KV, id) : null;
+
+if (!result) {
+	Astro.response.status = 404;
+}
+---
+
+<Layout title={result ? `${result.title} — nutrition facts` : 'Recipe not found'}>
+	<section class="max-w-[1400px] mx-auto px-md sm:px-lg py-3xl">
+		{
+			result ? (
+				<ResultsView result={result} />
+			) : (
+				<div class="max-w-[520px] mx-auto text-center py-5xl">
+					<h1 class="text-display-lg text-ink mb-sm">We couldn't find that result</h1>
+					<p class="text-body-md text-body mb-lg">
+						This link may have expired or never existed. Share links are kept for 90 days.
+					</p>
+					<a href="/" class="text-button-lg text-on-primary bg-primary rounded-pill px-md h-12 inline-flex items-center">
+						Analyze a new recipe
+					</a>
+				</div>
+			)
+		}
+	</section>
+</Layout>

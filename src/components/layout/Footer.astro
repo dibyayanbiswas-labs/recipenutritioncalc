@@ -1,0 +1,38 @@
+---
+const year = new Date().getFullYear();
+---
+
+<footer class="border-t border-hairline bg-canvas mt-4xl print:hidden">
+	<div class="max-w-[1400px] mx-auto px-md sm:px-lg py-3xl">
+		<div class="grid grid-cols-2 sm:grid-cols-4 gap-lg text-body-sm">
+			<div class="col-span-2 sm:col-span-1">
+				<p class="text-body-sm-strong text-ink mb-xs">Recipe Nutrition Calculator</p>
+				<p class="text-caption text-mute">Free recipe nutrition analysis. No account required.</p>
+			</div>
+			<div>
+				<p class="text-caption-mono text-mute mb-xs uppercase">Product</p>
+				<ul class="space-y-xxs">
+					<li><a href="/" class="text-body hover:text-ink">Calculator</a></li>
+					<li><a href="/how-it-works" class="text-body hover:text-ink">How it works</a></li>
+				</ul>
+			</div>
+			<div>
+				<p class="text-caption-mono text-mute mb-xs uppercase">Company</p>
+				<ul class="space-y-xxs">
+					<li><a href="/about" class="text-body hover:text-ink">About</a></li>
+				</ul>
+			</div>
+			<div>
+				<p class="text-caption-mono text-mute mb-xs uppercase">Legal</p>
+				<ul class="space-y-xxs">
+					<li><a href="/privacy" class="text-body hover:text-ink">Privacy</a></li>
+					<li><a href="/terms" class="text-body hover:text-ink">Terms</a></li>
+				</ul>
+			</div>
+		</div>
+		<p class="text-caption text-mute mt-2xl">
+			&copy; {year} Recipe Nutrition Calculator. Nutrition figures are estimates for informational purposes
+			only — not medical or dietary advice.
+		</p>
+	</div>
+</footer>

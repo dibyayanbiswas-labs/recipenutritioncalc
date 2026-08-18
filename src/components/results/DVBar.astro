@@ -1,0 +1,21 @@
+---
+interface Props {
+	label: string;
+	value: number;
+	unit: string;
+	percent: number;
+	nutrientKey?: string;
+}
+
+const { label, value, unit, percent, nutrientKey } = Astro.props;
+const clamped = Math.min(100, Math.max(0, percent));
+---
+
+<div class="flex items-center gap-sm py-xxs" data-nutrient-row data-key={nutrientKey}>
+	<span class="text-body-sm text-body w-[132px] shrink-0 truncate">{label}</span>
+	<div class="flex-1 h-1.5 rounded-full bg-canvas-soft-2 overflow-hidden">
+		<div class="h-full bg-accent rounded-full" style={`width: ${clamped}%`} data-bar-fill></div>
+	</div>
+	<span class="text-body-sm text-mute w-[68px] shrink-0 text-right" data-bar-value>{value}{unit}</span>
+	<span class="text-body-sm-strong text-ink w-[48px] shrink-0 text-right" data-bar-percent>{percent}%</span>
+</div>

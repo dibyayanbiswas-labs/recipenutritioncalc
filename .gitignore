@@ -1,6 +1,9 @@
 # build output
 dist/
 
+# local Cloudflare/Miniflare state (KV, cache, observability db)
+.wrangler/
+
 # generated types
 .astro/
 

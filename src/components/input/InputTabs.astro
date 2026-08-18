@@ -1,0 +1,100 @@
+---
+import PasteTextForm from './PasteTextForm.astro';
+import UrlForm from './UrlForm.astro';
+import ManualEntryForm from './ManualEntryForm.astro';
+import PhotoUploadForm from './PhotoUploadForm.astro';
+
+interface Props {
+	activeTab?: 'paste' | 'url' | 'manual' | 'photo';
+	textError?: string | null;
+	urlError?: string | null;
+	pasteValue?: string;
+	pasteTitle?: string;
+	pasteServings?: number;
+	urlValue?: string;
+}
+
+const {
+	activeTab = 'paste',
+	textError = null,
+	urlError = null,
+	pasteValue = '',
+	pasteTitle = '',
+	pasteServings,
+	urlValue = '',
+} = Astro.props;
+
+const tabs = [
+	{ id: 'paste', label: 'Paste text' },
+	{ id: 'url', label: 'From a URL' },
+	{ id: 'manual', label: 'Manual entry' },
+	{ id: 'photo', label: 'Photo' },
+] as const;
+---
+
+<div>
+	<div role="tablist" class="flex flex-wrap gap-xs mb-lg" id="input-tabs">
+		{
+			tabs.map((tab) => (
+				<button
+					type="button"
+					role="tab"
+					data-tab={tab.id}
+					aria-selected={tab.id === activeTab}
+					class:list={[
+						'text-body-sm rounded-pill-sm px-md h-9 border transition-colors',
+						tab.id === activeTab
+							? 'bg-primary text-on-primary border-primary'
+							: 'bg-canvas text-ink border-hairline hover:bg-canvas-soft',
+					]}
+				>
+					{tab.label}
+				</button>
+			))
+		}
+	</div>
+
+	<div data-tab-panel="paste" hidden={activeTab !== 'paste'}>
+		<PasteTextForm error={textError} value={pasteValue} title={pasteTitle} servings={pasteServings} />
+	</div>
+	<div data-tab-panel="url" hidden={activeTab !== 'url'}>
+		<UrlForm error={urlError} value={urlValue} />
+	</div>
+	<div data-tab-panel="manual" hidden={activeTab !== 'manual'}>
+		<ManualEntryForm />
+	</div>
+	<div data-tab-panel="photo" hidden={activeTab !== 'photo'}>
+		<PhotoUploadForm />
+	</div>
+</div>
+
+<script is:inline>
+	(function () {
+		var container = document.getElementById('input-tabs');
+		if (!container) return;
+
+		function activate(tabId) {
+			container.querySelectorAll('[role="tab"]').forEach(function (btn) {
+				var isActive = btn.getAttribute('data-tab') === tabId;
+				btn.setAttribute('aria-selected', String(isActive));
+				btn.classList.toggle('bg-primary', isActive);
+				btn.classList.toggle('text-on-primary', isActive);
+				btn.classList.toggle('border-primary', isActive);
+				btn.classList.toggle('bg-canvas', !isActive);
+				btn.classList.toggle('text-ink', !isActive);
+				btn.classList.toggle('border-hairline', !isActive);
+			});
+			document.querySelectorAll('[data-tab-panel]').forEach(function (panel) {
+				panel.hidden = panel.getAttribute('data-tab-panel') !== tabId;
+			});
+		}
+
+		container.querySelectorAll('[role="tab"]').forEach(function (btn) {
+			btn.addEventListener('click', function () {
+				activate(btn.getAttribute('data-tab'));
+			});
+		});
+
+		window.activateInputTab = activate;
+	})();
+</script>

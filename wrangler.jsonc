@@ -1,0 +1,20 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"compatibility_date": "2026-08-18",
+	"compatibility_flags": ["global_fetch_strictly_public"],
+	"name": "recipenutritioncalc",
+	"main": "@astrojs/cloudflare/entrypoints/server",
+	"assets": {
+		"directory": "./dist",
+		"binding": "ASSETS"
+	},
+	"kv_namespaces": [
+		{ "binding": "RESULTS_KV", "id": "placeholder-run-wrangler-kv-namespace-create" }
+	],
+	"ai": {
+		"binding": "AI"
+	},
+	"observability": {
+		"enabled": true
+	}
+}

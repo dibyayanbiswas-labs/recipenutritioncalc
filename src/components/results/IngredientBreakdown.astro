@@ -1,0 +1,42 @@
+---
+import Badge from '../ui/Badge.astro';
+import type { IngredientResult } from '../../lib/nutrients';
+
+interface Props {
+	ingredients: IngredientResult[];
+}
+
+const { ingredients } = Astro.props;
+
+function matchLabel(ing: IngredientResult): string {
+	if (ing.matchedName) return `Matched: ${ing.matchedName}`;
+	if (ing.matchConfidence === 'ai-estimated') return 'Not in our database — estimated by AI';
+	return 'No match found — using a generic estimate';
+}
+---
+
+<div class="space-y-xxs">
+	<p class="text-body-sm-strong text-ink mb-xs">Ingredients</p>
+	{
+		ingredients.map((ing) => (
+			<div class="flex items-start justify-between gap-sm py-xs border-b border-hairline last:border-b-0">
+				<div>
+					<p class="text-body-sm text-ink">{ing.raw}</p>
+					<p class="text-caption text-mute">
+						{matchLabel(ing)} · {ing.grams}g
+					</p>
+				</div>
+				<div class="flex flex-col items-end gap-xxs shrink-0">
+					<span class="text-body-sm text-ink">{Math.round(ing.nutrients.kcal)} kcal</span>
+					{ing.quantity === null && !ing.isOptionalOrToTaste && (
+							<Badge tone="warning">Amount not recognized — assumed 1</Badge>
+						)}
+						{ing.conversionSource === 'estimated' && <Badge tone="warning">Approximate</Badge>}
+					{ing.matchConfidence === 'low' && <Badge tone="warning">Low-confidence match</Badge>}
+					{ing.matchConfidence === 'ai-estimated' && <Badge tone="info">AI-estimated</Badge>}
+					{ing.matchConfidence === 'none' && <Badge tone="error">No match</Badge>}
+				</div>
+			</div>
+		))
+	}
+</div>
