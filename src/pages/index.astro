@@ -156,14 +156,35 @@ const appStructuredData = {
 	description="Free recipe nutrition calculator: paste ingredients, a URL, or a photo for an instant recipe calorie calculator breakdown — calories, macros, and 20+ micronutrients per serving. No login, no paywall."
 	structuredData={[appStructuredData, faqStructuredData]}
 >
-	<section class="max-w-[1400px] mx-auto px-md sm:px-lg pt-3xl pb-2xl">
-		<div class="max-w-[720px]">
-			<span class="text-caption-mono text-mute uppercase tracking-wide">Free · No login required</span>
-			<h1 class="text-display-xl text-ink mt-xs">The free Recipe Nutrition Calculator for any recipe.</h1>
-			<p class="text-body-lg text-body mt-sm">
-				Paste a recipe, drop in a link, or snap a photo. This online recipe nutrition calculator gets you
-				calories, full macros, and 20+ micronutrients per serving in seconds — free, with no login.
-			</p>
+	<section class="relative">
+		<div class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[380px] overflow-hidden" aria-hidden="true">
+			<div
+				class="absolute inset-x-0 top-[-220px] h-[520px] opacity-[0.14] blur-[110px] dark:opacity-[0.2]"
+				style="
+					background:
+						radial-gradient(38% 55% at 32% 45%, var(--color-accent) 0%, transparent 100%),
+						radial-gradient(36% 52% at 68% 40%, var(--color-warning) 0%, transparent 100%);
+					-webkit-mask-image:
+						linear-gradient(to bottom, #000 35%, transparent 100%),
+						linear-gradient(to right, transparent 0%, #000 18%, #000 82%, transparent 100%);
+					mask-image:
+						linear-gradient(to bottom, #000 35%, transparent 100%),
+						linear-gradient(to right, transparent 0%, #000 18%, #000 82%, transparent 100%);
+					-webkit-mask-composite: source-in;
+					mask-composite: intersect;
+				"
+			>
+			</div>
+		</div>
+		<div class="max-w-[1400px] mx-auto px-md sm:px-lg pt-3xl pb-2xl">
+			<div class="max-w-[720px]">
+				<span class="text-caption-mono text-mute uppercase tracking-wide">Free · No login required</span>
+				<h1 class="text-display-xl text-ink mt-xs">The free Recipe Nutrition Calculator for any recipe.</h1>
+				<p class="text-body-lg text-body mt-sm">
+					Paste a recipe, drop in a link, or snap a photo. This online recipe nutrition calculator gets you
+					calories, full macros, and 20+ micronutrients per serving in seconds — free, with no login.
+				</p>
+			</div>
 		</div>
 	</section>
 

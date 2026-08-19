@@ -1,0 +1,24 @@
+---
+export const prerender = true;
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout
+	title="Page not found — Recipe Nutrition Calculator"
+	description="This page doesn't exist. Head back to the recipe nutrition calculator."
+	noindex
+>
+	<section class="max-w-[720px] mx-auto px-md sm:px-lg py-5xl text-center">
+		<p class="text-display-xl text-ink">404</p>
+		<h1 class="text-display-lg text-ink mt-sm">Page not found</h1>
+		<p class="text-body-md text-body mt-sm max-w-[440px] mx-auto">
+			The page you're looking for doesn't exist, or the link may be broken.
+		</p>
+		<a
+			href="/"
+			class="text-button-lg bg-primary text-on-primary rounded-pill px-md h-12 inline-flex items-center mt-lg hover:opacity-90"
+		>
+			Back to the calculator
+		</a>
+	</section>
+</Layout>

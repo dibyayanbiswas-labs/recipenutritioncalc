@@ -1,0 +1,33 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const { error } = Astro.props;
+---
+
+<Layout
+	title="Something went wrong — Recipe Nutrition Calculator"
+	description="Something went wrong on our end. Please try again."
+	noindex
+>
+	<section class="max-w-[720px] mx-auto px-md sm:px-lg py-5xl text-center">
+		<p class="text-display-xl text-ink">500</p>
+		<h1 class="text-display-lg text-ink mt-sm">Something went wrong</h1>
+		<p class="text-body-md text-body mt-sm max-w-[440px] mx-auto">
+			Something broke on our end, not yours. Try again in a moment — if it keeps happening,
+			<a href="/contact" class="text-link hover:underline">let us know</a>.
+		</p>
+		{
+			import.meta.env.DEV && error && (
+				<pre class="text-code text-left bg-canvas-soft rounded-md p-md mt-lg overflow-x-auto">
+					{error instanceof Error ? error.stack : String(error)}
+				</pre>
+			)
+		}
+		<a
+			href="/"
+			class="text-button-lg bg-primary text-on-primary rounded-pill px-md h-12 inline-flex items-center mt-lg hover:opacity-90"
+		>
+			Back to the calculator
+		</a>
+	</section>
+</Layout>
