@@ -30,6 +30,10 @@ export interface IngredientResult {
 	conversionSource: ConversionSource;
 	matchedName: string | null;
 	matchConfidence: MatchConfidence | 'none' | 'ai-estimated';
+	/** True when a comparably-good alternative match exists with a meaningfully different nutrient
+	 * profile (e.g. "cheese" -> cheddar vs. swiss vs. cottage), so the top pick shouldn't be trusted
+	 * without the user confirming which food was actually meant. */
+	ambiguous: boolean;
 	nutrients: NutrientProfile;
 	isOptionalOrToTaste: boolean;
 	allergens: string[];
@@ -82,6 +86,7 @@ export async function analyzeIngredientLines(lines: ParsedIngredientLine[], ai?:
 				conversionSource,
 				matchedName: entry?.name ?? null,
 				matchConfidence,
+				ambiguous: match?.ambiguous ?? false,
 				nutrients,
 				isOptionalOrToTaste: line.isOptionalOrToTaste,
 				allergens: entry?.allergens ?? [],

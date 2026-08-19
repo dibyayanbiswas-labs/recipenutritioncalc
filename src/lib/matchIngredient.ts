@@ -72,6 +72,11 @@ export interface IngredientMatch {
 	confidence: MatchConfidence;
 	/** Fraction of the query's tokens found in the matched entry's canonical name (0-1). */
 	score: number;
+	/** True when another near-equally-scored candidate has a meaningfully different nutrient
+	 * profile — e.g. "cheese" scores an equally good match against cheddar, swiss, and cottage
+	 * cheese, whose calorie counts differ by 4x. Picking one over the others would be a guess,
+	 * so callers should surface this for user review rather than silently trusting the top pick. */
+	ambiguous: boolean;
 }
 
 const STOP_WORDS = new Set(['a', 'an', 'the', 'of', 'and', 'or', 'fresh', 'large', 'small', 'medium']);
@@ -90,6 +95,10 @@ const COOKED_STATE_WORDS = new Set([
 	'smoked',
 	'stewed',
 	'simmered',
+	'casseroled',
+	'seared',
+	'charred',
+	'rotisserie',
 ]);
 
 /** Very light suffix stemming so "sugars"/"tomatoes"/"onions" match their singular query forms. */
@@ -192,6 +201,14 @@ const UNCOMMON_VARIANT_PENALTY = 0.15;
 // but still well under PRIMARY_MATCH_BONUS/typical coverage gaps, so it never promotes an outright
 // worse or unrelated match just for being in the requested region.
 const REGION_MATCH_BONUS = 0.3;
+// How close a runner-up's rankScore must be to the winner's to be considered "tied" for ambiguity
+// purposes. Deliberately tight — real variety ties (e.g. every "Cheese, <variety>" entry) land at
+// the *exact* same score, so this only needs to cover floating-point/position-bonus noise, not a
+// wide band that would also sweep in genuinely lower-ranked candidates.
+const AMBIGUITY_SCORE_MARGIN = 0.05;
+// Two candidates this far apart in kcal/100g are different enough foods that picking the wrong one
+// would meaningfully skew the result — the bar for actually flagging a near-tie as ambiguous.
+const AMBIGUITY_KCAL_SPREAD = 40;
 
 /** Matches a parsed ingredient name against the bundled nutrition database via an inverted-index lookup + query-coverage scoring.
  * `region`, when given, nudges scoring toward that region's food composition data without excluding the rest — a recipe's
@@ -214,6 +231,11 @@ export function matchIngredient(name: string, region?: RegionCode): IngredientMa
 	let bestEntryIndex = -1;
 	let bestRankScore = -Infinity;
 	let bestCoverage = 0;
+	let bestSignature = '';
+	// Best rankScore + representative kcal per distinct name-token signature — collapses the same
+	// food listed by multiple regional databases (which commonly differ a little in kcal purely from
+	// source methodology) into one candidate, so cross-region duplication alone never reads as ambiguity.
+	const bestBySignature = new Map<string, { rankScore: number; kcal: number }>();
 
 	for (const entryIndex of candidateEntryIndices) {
 		const nameTokens = entryNameTokens[entryIndex];
@@ -226,6 +248,11 @@ export function matchIngredient(name: string, region?: RegionCode): IngredientMa
 		const hasRawWord = nameTokens.has('raw');
 		const hasUncommonVariantWord = [...nameTokens].some((t) => UNCOMMON_VARIANT_WORDS.has(t));
 		const hasProcessedFormWord = [...nameTokens].some((t) => PROCESSED_FORM_WORDS.has(t));
+
+		const isOffType =
+			(hasCookedWord && !queryHasCookedWord) ||
+			(hasUncommonVariantWord && ![...queryTokens].some((t) => UNCOMMON_VARIANT_WORDS.has(t))) ||
+			(hasProcessedFormWord && ![...queryTokens].some((t) => PROCESSED_FORM_WORDS.has(t)));
 
 		const primaryTokens = entryPrimaryTokens[entryIndex];
 		let primaryIntersection = 0;
@@ -260,10 +287,18 @@ export function matchIngredient(name: string, region?: RegionCode): IngredientMa
 			rankScore += REGION_MATCH_BONUS;
 		}
 
+		const signature = [...nameTokens].sort().join('|');
+		if (!isOffType) {
+			const existing = bestBySignature.get(signature);
+			if (!existing || rankScore > existing.rankScore) {
+				bestBySignature.set(signature, { rankScore, kcal: INGREDIENTS[entryIndex].per100g.kcal });
+			}
+		}
 		if (rankScore > bestRankScore) {
 			bestRankScore = rankScore;
 			bestEntryIndex = entryIndex;
 			bestCoverage = coverage;
+			bestSignature = signature;
 		}
 	}
 
@@ -271,5 +306,20 @@ export function matchIngredient(name: string, region?: RegionCode): IngredientMa
 
 	const confidence: MatchConfidence = bestCoverage >= 0.9 ? 'high' : bestCoverage >= 0.5 ? 'medium' : 'low';
 
-	return { entry: INGREDIENTS[bestEntryIndex], confidence, score: bestCoverage };
+	// A near-tied runner-up only matters if picking it instead would actually change the nutrition
+	// result — e.g. picking cheddar over swiss cheese matters, picking one region's "chicken breast,
+	// raw" over another's essentially doesn't. Comparing best-per-signature (rather than every raw
+	// candidate) keeps that same-food-different-region case from reading as a tie in the first place.
+	const bestKcal = INGREDIENTS[bestEntryIndex].per100g.kcal;
+	let ambiguous = false;
+	for (const [signature, candidate] of bestBySignature) {
+		if (signature === bestSignature) continue;
+		if (bestRankScore - candidate.rankScore > AMBIGUITY_SCORE_MARGIN) continue;
+		if (Math.abs(candidate.kcal - bestKcal) > AMBIGUITY_KCAL_SPREAD) {
+			ambiguous = true;
+			break;
+		}
+	}
+
+	return { entry: INGREDIENTS[bestEntryIndex], confidence, score: bestCoverage, ambiguous };
 }

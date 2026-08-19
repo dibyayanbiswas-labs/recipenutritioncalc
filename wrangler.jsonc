@@ -9,7 +9,7 @@
 		"binding": "ASSETS"
 	},
 	"kv_namespaces": [
-		{ "binding": "RESULTS_KV", "id": "placeholder-run-wrangler-kv-namespace-create" }
+		{ "binding": "RESULTS_KV", "id": "514ec4818cab404a92ddb93ea43f4db4" }
 	],
 	"ai": {
 		"binding": "AI"

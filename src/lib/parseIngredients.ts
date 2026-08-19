@@ -124,7 +124,11 @@ function extractQuantityUnitFromEnd(text: string): { quantity: number; unit: str
 		if (def) unit = def.canonical;
 	}
 
-	const rest = text.slice(0, match.index).trim();
+	// Strip a trailing "name - " / "name: " connector, e.g. "Chicken breast - 500 g", "Rice: 2 cups".
+	const rest = text
+		.slice(0, match.index)
+		.replace(/[\s]*[-:–—][\s]*$/, '')
+		.trim();
 	if (!rest) return null; // nothing left to call an ingredient name — not a useful match
 	return { quantity, unit, rest };
 }
@@ -141,6 +145,59 @@ function extractUnit(text: string): { unit: string | null; rest: string } {
 	return { unit: null, rest: text };
 }
 
+// Preparation words that describe how an ingredient was cut/handled rather than what it is —
+// safe to strip from the name before food-database matching. Deliberately excludes words like
+// "ground" that usually name a distinct product in nutrition data (ground beef vs. beef, ground
+// cinnamon vs. cinnamon stick), where stripping would change which food gets matched.
+const PREP_WORDS = [
+	'chopped',
+	'diced',
+	'minced',
+	'grated',
+	'sliced',
+	'crushed',
+	'shredded',
+	'peeled',
+	'julienned',
+	'cubed',
+	'melted',
+	'softened',
+	'beaten',
+	'whisked',
+	'mashed',
+	'trimmed',
+	'halved',
+	'quartered',
+	'zested',
+	'juiced',
+	'crumbled',
+	'sifted',
+	'deveined',
+	'seeded',
+	'cored',
+	'pitted',
+];
+const PREP_ADVERBS = ['finely', 'coarsely', 'roughly', 'thinly', 'thickly', 'freshly', 'loosely'];
+const PREP_WORD_PATTERN = `(?:(?:${PREP_ADVERBS.join('|')})\\s+)?(?:${PREP_WORDS.join('|')})`;
+const LEADING_PREP = new RegExp(`^${PREP_WORD_PATTERN}\\b\\s*`, 'i');
+const TRAILING_PREP = new RegExp(`\\s+${PREP_WORD_PATTERN}$`, 'i');
+
+/** Strips a leading or trailing preparation word not already caught by a comma clause,
+ * e.g. "chopped tomatoes" -> "tomatoes" (+"chopped" as a note), so it doesn't hurt food matching. */
+function extractPreparationWord(text: string): { text: string; prep: string | null } {
+	const leading = text.match(LEADING_PREP);
+	if (leading) {
+		const rest = text.slice(leading[0].length).trim();
+		if (rest) return { text: rest, prep: leading[0].trim() };
+	}
+	const trailing = text.match(TRAILING_PREP);
+	if (trailing) {
+		const rest = text.slice(0, trailing.index).trim();
+		if (rest) return { text: rest, prep: trailing[0].trim() };
+	}
+	return { text, prep: null };
+}
+
 function extractNotes(text: string): { text: string; notes: string | null } {
 	const notes: string[] = [];
 	const withoutParens = text.replace(/\(([^)]*)\)/g, (_m, inner) => {
@@ -154,8 +211,12 @@ function extractNotes(text: string): { text: string; notes: string | null } {
 		name = commaMatch[1];
 		notes.push(commaMatch[2].trim());
 	}
+
+	const { text: nameWithoutPrep, prep } = extractPreparationWord(name.replace(/\s+/g, ' ').trim());
+	if (prep) notes.push(prep);
+
 	return {
-		text: name.replace(/\s+/g, ' ').trim(),
+		text: nameWithoutPrep,
 		notes: notes.length > 0 ? notes.join(', ') : null,
 	};
 }
@@ -163,6 +224,20 @@ function extractNotes(text: string): { text: string; notes: string | null } {
 function detectOptional(text: string): boolean {
 	const lower = text.toLowerCase();
 	return OPTIONAL_PHRASES.some((phrase) => lower.includes(phrase));
+}
+
+const SECTION_HEADING_KEYWORDS =
+	/^(for the|to serve|to garnish|toppings?|garnish|assembly|filling|topping|crust|base|dressing|marinade|glaze|frosting|icing|method|instructions?|directions?)\b/i;
+
+/** True for recipe section dividers like "FOR THE CHICKEN" or "For the sauce:" — never a real
+ * ingredient line, so these are dropped before parsing rather than turned into a bogus zero-quantity
+ * ingredient. Any digit rules a line out, since a real ingredient amount always contains one. */
+function isSectionHeadingLine(line: string): boolean {
+	const trimmed = line.replace(/:\s*$/, '').trim();
+	if (trimmed.length === 0 || /\d/.test(trimmed)) return false;
+	if (SECTION_HEADING_KEYWORDS.test(trimmed)) return true;
+	const letters = trimmed.replace(/[^a-zA-Z]/g, '');
+	return letters.length >= 3 && trimmed === trimmed.toUpperCase();
 }
 
 /** True if the whole line is nothing but a quantity (+ optional unit) — e.g. "500g" on its own line. */
@@ -204,7 +279,8 @@ export function splitIntoLines(text: string): string[] {
 		.split(/\r?\n/)
 		.map((l) => l.trim())
 		.filter((l) => l.length > 0)
-		.map((l) => l.replace(/^[-*•]\s*/, '').replace(/^\d+[.)]\s*/, ''));
+		.map((l) => l.replace(/^[-*•]\s*/, '').replace(/^\d+[.)]\s*/, ''))
+		.filter((l) => !isSectionHeadingLine(l));
 
 	// "basmati rice" / "500g" on consecutive lines -> merge into "basmati rice 500g".
 	const merged: string[] = [];
@@ -256,6 +332,15 @@ export function parseIngredientLine(raw: string): ParsedIngredientLine {
 
 	// "of" connector, e.g. "1 cup of flour"
 	working = working.replace(/^of\s+/i, '');
+
+	// Drop "to taste" / "optional" / etc. from the name itself so it doesn't hurt food-database
+	// matching, e.g. "salt to taste" -> "salt" (isOptionalOrToTaste is already recorded above).
+	if (isOptionalOrToTaste) {
+		for (const phrase of OPTIONAL_PHRASES) {
+			working = working.replace(new RegExp(`\\s*,?\\s*${escapeRegExp(phrase)}\\b`, 'gi'), '');
+		}
+		working = working.trim();
+	}
 
 	const { text: ingredientName, notes } = extractNotes(working);
 

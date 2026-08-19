@@ -35,6 +35,7 @@ function matchLabel(ing: IngredientResult): string {
 					{ing.matchConfidence === 'low' && <Badge tone="warning">Low-confidence match</Badge>}
 					{ing.matchConfidence === 'ai-estimated' && <Badge tone="info">AI-estimated</Badge>}
 					{ing.matchConfidence === 'none' && <Badge tone="error">No match</Badge>}
+					{ing.ambiguous && <Badge tone="warning">Ambiguous — please verify</Badge>}
 				</div>
 			</div>
 		))
