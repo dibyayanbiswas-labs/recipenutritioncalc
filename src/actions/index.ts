@@ -21,7 +21,7 @@ export const server = {
 		}),
 		handler: async ({ text, servings, title }) => {
 			const formatCheck = checkIngredientTextFormat(text);
-			if (!formatCheck.ok) {
+			if (!formatCheck.ok && formatCheck.blocking) {
 				throw new ActionError({ code: 'BAD_REQUEST', message: formatCheck.reason ?? 'That format is hard to read.' });
 			}
 
@@ -33,6 +33,7 @@ export const server = {
 				servings,
 				createdAt: Date.now(),
 				ai: env.AI,
+				formatWarning: formatCheck.ok ? null : (formatCheck.reason ?? null),
 			});
 			await saveResult(env.RESULTS_KV, result);
 			return result;

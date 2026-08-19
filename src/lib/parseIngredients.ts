@@ -279,15 +279,20 @@ export interface FormatCheckResult {
 	ok: boolean;
 	reason?: string;
 	unparsedExamples?: string[];
+	/** True only when there's nothing to calculate at all — callers should stop the user from
+	 * submitting. False (or absent) means the format looks off but there's still something to
+	 * work with, so callers should warn and let the calculation proceed. */
+	blocking?: boolean;
 }
 
 /** Best-effort sanity check: if most lines have no detectable quantity at all, the paste is probably
- * malformed rather than just containing a few "salt to taste"-style items. Used to block calculation
- * with actionable feedback instead of silently producing a mostly-empty result. */
+ * malformed rather than just containing a few "salt to taste"-style items. Only the empty-input case
+ * blocks calculation outright; a bad-but-nonempty format just gets flagged as a warning, since a
+ * best-effort result is more useful than none. */
 export function checkIngredientTextFormat(text: string): FormatCheckResult {
 	const lines = parseIngredients(text);
 	if (lines.length === 0) {
-		return { ok: false, reason: 'Add at least one ingredient line.' };
+		return { ok: false, blocking: true, reason: 'Add at least one ingredient line.' };
 	}
 
 	const unparsed = lines.filter((l) => l.quantity === null && l.quantityRange === null && !l.isOptionalOrToTaste);

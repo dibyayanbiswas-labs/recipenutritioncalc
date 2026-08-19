@@ -1,4 +1,8 @@
-import ingredientsData from '../data/ingredients.json';
+import ingredientsUS from '../data/ingredients.json';
+import ingredientsUK from '../data/ingredients.uk.json';
+import ingredientsAU from '../data/ingredients.au.json';
+import ingredientsCA from '../data/ingredients.ca.json';
+import ingredientsIN from '../data/ingredients.in.json';
 
 export interface NutrientProfile {
 	kcal: number;
@@ -32,16 +36,34 @@ export interface NutrientProfile {
 	cholesterol_mg?: number;
 }
 
+/** Food composition database a region's data was sourced from. */
+export type RegionCode = 'US' | 'UK' | 'AU' | 'CA' | 'IN';
+
+export const REGIONS: { code: RegionCode; label: string; source: string }[] = [
+	{ code: 'US', label: 'United States', source: 'USDA FoodData Central' },
+	{ code: 'UK', label: 'United Kingdom', source: 'McCance & Widdowson / CoFID' },
+	{ code: 'AU', label: 'Australia', source: 'Australian Food Composition Database' },
+	{ code: 'CA', label: 'Canada', source: 'Canadian Nutrient File' },
+	{ code: 'IN', label: 'India', source: 'Indian Nutrient Databank (from IFCT 2017)' },
+];
+
 export interface IngredientEntry {
 	name: string;
 	aliases: string[];
 	per100g: NutrientProfile;
+	region: RegionCode;
 	gPerCup?: number;
 	avgUnitWeightG?: number;
 	allergens?: string[];
 }
 
-export const INGREDIENTS = ingredientsData as IngredientEntry[];
+export const INGREDIENTS = [
+	...(ingredientsUS as IngredientEntry[]),
+	...(ingredientsUK as IngredientEntry[]),
+	...(ingredientsAU as IngredientEntry[]),
+	...(ingredientsCA as IngredientEntry[]),
+	...(ingredientsIN as IngredientEntry[]),
+];
 
 export type MatchConfidence = 'high' | 'medium' | 'low';
 
@@ -134,7 +156,10 @@ const entryNameTokens: Set<string>[] = entryNameTokensOrdered.map((t) => new Set
 // Kept intentionally small and conservative: each entry here was verified against real data, since
 // this pattern doesn't hold universally (e.g. "Crackers, milk" is milk-FLAVORED crackers, not a
 // "crackers" category label followed by the real identity).
-const CATEGORY_PREFIX_DENYLIST = new Set(['spices', 'nuts', 'seeds']);
+// 'grains' added for CNF (Canadian Nutrient File), which consistently uses the same category-prefix
+// convention for its staple grain entries (e.g. "Grains, wheat flour, white, all purpose, bleached";
+// "Grains, rice, brown, medium-grain, dry") — verified against the bundled CNF data.
+const CATEGORY_PREFIX_DENYLIST = new Set(['spices', 'nuts', 'seeds', 'grains']);
 const entryPrimaryTokens: Set<string>[] = INGREDIENTS.map((e) => {
 	const segments = e.name.split(',');
 	const first = segments[0].trim();
@@ -162,9 +187,16 @@ const EXTRA_TOKEN_PENALTY = 0.08;
 const PRIMARY_MATCH_BONUS = 0.5;
 const POSITION_BONUS_WEIGHT = 0.15;
 const UNCOMMON_VARIANT_PENALTY = 0.15;
+// Large enough to win out over a shorter/terser name from a different region for the same food
+// (regional entries often carry more qualifiers than a source's own single best-known name would),
+// but still well under PRIMARY_MATCH_BONUS/typical coverage gaps, so it never promotes an outright
+// worse or unrelated match just for being in the requested region.
+const REGION_MATCH_BONUS = 0.3;
 
-/** Matches a parsed ingredient name against the bundled nutrition database via an inverted-index lookup + query-coverage scoring. */
-export function matchIngredient(name: string): IngredientMatch | null {
+/** Matches a parsed ingredient name against the bundled nutrition database via an inverted-index lookup + query-coverage scoring.
+ * `region`, when given, nudges scoring toward that region's food composition data without excluding the rest — a recipe's
+ * ingredients may still fall back to another region's entry when the preferred region has no reasonable match. */
+export function matchIngredient(name: string, region?: RegionCode): IngredientMatch | null {
 	const queryTokens = tokenize(name);
 	if (queryTokens.size === 0) return null;
 
@@ -223,6 +255,9 @@ export function matchIngredient(name: string): IngredientMatch | null {
 		}
 		if (hasProcessedFormWord && ![...queryTokens].some((t) => PROCESSED_FORM_WORDS.has(t))) {
 			rankScore -= UNCOMMON_VARIANT_PENALTY;
+		}
+		if (region && INGREDIENTS[entryIndex].region === region) {
+			rankScore += REGION_MATCH_BONUS;
 		}
 
 		if (rankScore > bestRankScore) {

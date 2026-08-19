@@ -43,6 +43,10 @@ const servingsPrefilled = servings !== undefined;
 		<label for="ingredient-textarea" class="text-body-sm-strong text-ink block mb-xxs"
 			>Paste your ingredients (one per line)</label
 		>
+		<p class="text-caption text-mute mb-xxs">
+			One ingredient per line, formatted as <span class="font-mono">amount unit ingredient</span> — e.g.
+			<span class="font-mono">500g basmati rice</span> or <span class="font-mono">2 cups flour</span>.
+		</p>
 		<textarea
 			id="ingredient-textarea"
 			name="text"
@@ -58,7 +62,7 @@ const servingsPrefilled = servings !== undefined;
 
 	<div class="flex items-center gap-md">
 		<Button type="submit">Calculate nutrition</Button>
-		<button type="button" id="paste-start-over" class="text-body-sm-strong text-link hover:underline">Start over</button>
+		<Button type="button" id="paste-start-over" variant="secondary">Start over</Button>
 	</div>
 </form>
 
@@ -75,18 +79,31 @@ const servingsPrefilled = servings !== undefined;
 	form?.addEventListener('submit', (e) => {
 		if (!textarea || !errorEl) return;
 		const check = checkIngredientTextFormat(textarea.value);
-		if (!check.ok) {
+		if (check.ok) {
+			errorEl.classList.add('hidden');
+			return;
+		}
+
+		let message = check.reason ?? 'That format is hard to read.';
+		if (check.unparsedExamples?.length) {
+			message += ` We couldn't read: "${check.unparsedExamples.join('", "')}".`;
+		}
+
+		if (check.blocking) {
 			e.preventDefault();
-			let message = check.reason ?? 'That format is hard to read.';
-			if (check.unparsedExamples?.length) {
-				message += ` We couldn't read: "${check.unparsedExamples.join('", "')}".`;
-			}
 			errorEl.textContent = message;
 			errorEl.classList.remove('hidden');
+			errorEl.classList.remove('text-warning-deep');
+			errorEl.classList.add('text-error-deep');
 			textarea.focus();
-		} else {
-			errorEl.classList.add('hidden');
+			return;
 		}
+
+		// Not blocking — let the calculation proceed, just warn that results may be off.
+		errorEl.textContent = `Heads up: ${message} Results may be less accurate.`;
+		errorEl.classList.remove('hidden');
+		errorEl.classList.remove('text-error-deep');
+		errorEl.classList.add('text-warning-deep');
 	});
 </script>
 

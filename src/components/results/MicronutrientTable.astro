@@ -19,10 +19,10 @@ const columns = [MICRO_META.slice(0, mid), MICRO_META.slice(mid)];
 
 <div>
 	<p class="text-body-sm-strong text-ink mb-sm">Vitamins &amp; minerals (per serving, % Daily Value)</p>
-	<div class="grid sm:grid-cols-2 gap-x-xl">
+	<div class="grid sm:grid-cols-2 gap-x-lg">
 		{
-			columns.map((column) => (
-				<div class="sm:divide-y sm:divide-hairline">
+			columns.map((column, i) => (
+				<div class:list={['sm:divide-y sm:divide-hairline', i === 1 && 'sm:border-l sm:border-hairline sm:pl-lg']}>
 					{column.map((m) => (
 						<DVBar
 							label={m.label}

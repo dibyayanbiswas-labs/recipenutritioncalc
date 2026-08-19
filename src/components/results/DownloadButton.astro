@@ -17,19 +17,26 @@ const { title } = Astro.props;
 
 <script>
 	import { exportElementAsPdf } from '../../lib/exportPdf';
+	import { printElementAsPdf } from '../../lib/printAsPdf';
 	import { slugifyTitle } from '../../lib/slug';
 
 	const btn = document.getElementById('download-button') as HTMLButtonElement | null;
 
 	btn?.addEventListener('click', async () => {
 		const title = btn.dataset.title || 'recipe';
+		const filename = `${slugifyTitle(title)}-nutrition`;
 		const originalLabel = btn.textContent;
 		btn.textContent = 'Preparing PDF…';
 		btn.disabled = true;
 		try {
-			await exportElementAsPdf('results-root', `${slugifyTitle(title)}-nutrition`);
+			await exportElementAsPdf('results-root', filename);
 		} catch (err) {
-			console.error('PDF export failed', err);
+			// The canvas-based export can fail for reasons outside our control (fonts, canvas size
+			// limits, browser quirks) — fall back to the browser's native print-to-PDF, which renders
+			// the real DOM instead of a rasterized snapshot and so isn't subject to the same failures.
+			console.error('PDF export failed, falling back to the print dialog', err);
+			btn.textContent = 'Opening print dialog…';
+			printElementAsPdf('results-root', filename);
 		} finally {
 			btn.textContent = originalLabel;
 			btn.disabled = false;

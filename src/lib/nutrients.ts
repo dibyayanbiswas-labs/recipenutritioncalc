@@ -47,6 +47,9 @@ export interface NutritionResult {
 	healthScore: HealthScore;
 	sourceUrl: string | null;
 	createdAt: number;
+	/** Set when the pasted ingredient text didn't match the expected "amount unit ingredient" format
+	 * closely enough to trust — surfaced to the user as a non-blocking accuracy warning. */
+	formatWarning: string | null;
 }
 
 /** Resolves each parsed ingredient line into a nutrient contribution, using the bundled ingredient database, with a Workers AI estimate as a last-resort fallback for lines that don't match anything at all. */
@@ -95,8 +98,9 @@ export function buildNutritionResult(params: {
 	ingredients: IngredientResult[];
 	sourceUrl?: string | null;
 	createdAt: number;
+	formatWarning?: string | null;
 }): NutritionResult {
-	const { id, title, servings, ingredients, sourceUrl = null, createdAt } = params;
+	const { id, title, servings, ingredients, sourceUrl = null, createdAt, formatWarning = null } = params;
 	const safeServings = servings > 0 ? servings : 1;
 
 	const totals = ingredients.reduce((acc, ing) => addProfiles(acc, ing.nutrients), emptyProfile());
@@ -115,6 +119,7 @@ export function buildNutritionResult(params: {
 		healthScore: computeHealthScore(perServing),
 		sourceUrl,
 		createdAt,
+		formatWarning,
 	};
 }
 
@@ -127,9 +132,10 @@ export async function analyzeRecipeText(params: {
 	sourceUrl?: string | null;
 	createdAt: number;
 	ai?: Ai;
+	formatWarning?: string | null;
 }): Promise<NutritionResult> {
-	const { ai, ...rest } = params;
+	const { ai, formatWarning, ...rest } = params;
 	const lines = parseIngredients(params.text);
 	const ingredients = await analyzeIngredientLines(lines, ai);
-	return buildNutritionResult({ ...rest, ingredients });
+	return buildNutritionResult({ ...rest, ingredients, formatWarning });
 }

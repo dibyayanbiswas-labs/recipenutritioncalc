@@ -3,7 +3,7 @@
  * libraries are dynamically imported so their ~200KB stays out of the initial page bundle. */
 export async function exportElementAsPdf(targetId: string, filename: string): Promise<void> {
 	const target = document.getElementById(targetId);
-	if (!target) return;
+	if (!target) throw new Error(`exportElementAsPdf: no element with id "${targetId}" found`);
 
 	const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')]);
 
