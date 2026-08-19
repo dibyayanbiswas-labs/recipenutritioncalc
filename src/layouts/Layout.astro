@@ -10,12 +10,24 @@ import Footer from '../components/layout/Footer.astro';
 interface Props {
 	title?: string;
 	description?: string;
+	keywords?: string;
+	ogType?: 'website' | 'article';
+	noindex?: boolean;
+	structuredData?: object | object[];
 }
 
 const {
-	title = 'Recipe Nutrition Calculator — accurate macros & micros, no login',
-	description = 'Paste a recipe, a URL, or a photo and get calories, full macros, and 20+ micronutrients per serving — free, no account, no paywall.',
+	title = 'Free Recipe Nutrition Calculator — Calories, Macros & Micros',
+	description = 'Free recipe nutrition calculator: paste ingredients, a URL, or a photo and get an instant recipe calorie calculator breakdown — calories, macros, and 20+ micronutrients per serving. No login, no paywall.',
+	keywords = 'recipe nutrition calculator, recipe nutrition calculator free, free recipe nutrition calculator, best free recipe nutrition calculator, recipe nutrition calculator app, best recipe nutrition calculator, online recipe nutrition calculator, free recipe nutrition calculator app, recipe calorie calculator, recipe calorie calculator free, recipe calorie calculator app, free recipe calorie calculator, best recipe calorie calculator, food recipe calorie calculator, online recipe calorie calculator, homemade recipe calorie calculator, recipe calorie calculator online, ingredients recipe calorie calculator',
+	ogType = 'website',
+	noindex = false,
+	structuredData,
 } = Astro.props;
+
+const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+const ogImageURL = new URL('/icons/icon-512.png', Astro.site);
+const jsonLdBlocks = structuredData ? (Array.isArray(structuredData) ? structuredData : [structuredData]) : [];
 ---
 
 <!doctype html>
@@ -27,6 +39,28 @@ const {
 		<meta name="generator" content={Astro.generator} />
 		<title>{title}</title>
 		<meta name="description" content={description} />
+		<meta name="keywords" content={keywords} />
+		{noindex ? <meta name="robots" content="noindex, nofollow" /> : <meta name="robots" content="index, follow" />}
+		<link rel="canonical" href={canonicalURL} />
+
+		<!-- Open Graph -->
+		<meta property="og:type" content={ogType} />
+		<meta property="og:site_name" content="Recipe Nutrition Calculator" />
+		<meta property="og:title" content={title} />
+		<meta property="og:description" content={description} />
+		<meta property="og:url" content={canonicalURL} />
+		<meta property="og:image" content={ogImageURL} />
+		<meta property="og:image:width" content="512" />
+		<meta property="og:image:height" content="512" />
+		<meta property="og:locale" content="en_US" />
+
+		<!-- Twitter -->
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content={title} />
+		<meta name="twitter:description" content={description} />
+		<meta name="twitter:image" content={ogImageURL} />
+
+		{jsonLdBlocks.map((block) => <script type="application/ld+json" set:html={JSON.stringify(block)} is:inline />)}
 
 		<link rel="manifest" href="/manifest.webmanifest" />
 		<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />

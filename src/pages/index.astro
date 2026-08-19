@@ -43,30 +43,101 @@ const urlError = flash?.tab === 'url' ? (flash.error ?? null) : null;
 const manualError = flash?.tab === 'manual' ? (flash.error ?? null) : null;
 const nutritionResult = flash?.resultId ? await loadResult(env.RESULTS_KV, flash.resultId) : null;
 
-const features = [
+const steps = [
 	{
-		title: 'Every macro and 20+ micros',
-		body: 'Calories, protein, carbs, fat, fiber, sugar, sodium, plus vitamins and minerals with %DV — not just the six numbers most calculators stop at.',
+		n: '01',
+		title: 'Paste, link, or snap a photo',
+		body: 'Type your ingredient list, drop in a recipe URL, or upload a photo of a printed or handwritten one. No reformatting needed.',
 	},
 	{
-		title: 'No account, no paywall',
-		body: 'Paste a recipe and get results instantly. Every analysis gets a shareable link automatically — no sign-up required to save or share.',
+		n: '02',
+		title: 'Every ingredient gets matched',
+		body: 'Quantities and units are parsed and converted to grams, then matched against a USDA-derived nutrition database — flagged clearly if a match is approximate.',
+	},
+	{
+		n: '03',
+		title: 'Get the full nutrition picture',
+		body: 'Calories, full macros, 20+ micronutrients, and a health score per serving — plus a shareable link, generated automatically.',
+	},
+];
+
+const features = [
+	{
+		title: 'Every macro, 20+ micros',
+		body: 'Calories, protein, carbs, fat, fiber, sugar, sodium, plus vitamins and minerals with %DV — most calculators stop at six numbers.',
+	},
+	{
+		title: 'Free, start to finish',
+		body: 'No account, no paywalled results, no metered daily limit. Every calculation is free, every time.',
 	},
 	{
 		title: 'Honest about estimates',
-		body: 'When we can\'t find an exact ingredient match or unit conversion, we say so — flagged right on the ingredient line, not hidden.',
+		body: 'Can\'t find an exact match? We flag the line as approximate or AI-estimated instead of hiding the uncertainty.',
+	},
+	{
+		title: 'Three ways to add a recipe',
+		body: 'Paste text, drop in a URL, or upload a photo. Same detailed breakdown, whichever way you start.',
 	},
 ];
+
+const faqs = [
+	{
+		q: 'Is this recipe nutrition calculator really free?',
+		a: 'Yes — pasting ingredients, importing a URL, uploading a photo, and the full macro and micronutrient breakdown are all free, with no account and no paywalled results.',
+	},
+	{
+		q: 'How accurate is this recipe calorie calculator?',
+		a: 'Exact ingredient matches are as accurate as the underlying USDA-derived data. When a match or unit conversion has to fall back to a generic estimate, that line is clearly flagged rather than shown as precise. See how it works for the full methodology.',
+	},
+	{
+		q: 'Can I use it as an online recipe nutrition calculator for any recipe?',
+		a: 'Yes — paste ingredient text, drop in a link to a recipe page with structured recipe data, or upload a photo of a printed or handwritten list. It works for homemade recipes and ones copied from anywhere on the web.',
+	},
+	{
+		q: 'Do I need to install an app?',
+		a: 'No — it runs in your browser at recipenutritioncalc.com. Add it to your home screen for one-tap access if you want an app-like feel, without an app-store install.',
+	},
+	{
+		q: 'How is this different from a calculator that only shows calories?',
+		a: 'Most free recipe calorie calculators stop at calories, protein, carbs, and fat. This one adds 20+ micronutrients and a health score, so you get a complete picture, not just a calorie count.',
+	},
+];
+
+const faqStructuredData = {
+	'@context': 'https://schema.org',
+	'@type': 'FAQPage',
+	mainEntity: faqs.map((f) => ({
+		'@type': 'Question',
+		name: f.q,
+		acceptedAnswer: { '@type': 'Answer', text: f.a },
+	})),
+};
+
+const appStructuredData = {
+	'@context': 'https://schema.org',
+	'@type': 'WebApplication',
+	name: 'Recipe Nutrition Calculator',
+	url: 'https://recipenutritioncalc.com/',
+	description:
+		'Free recipe nutrition calculator and recipe calorie calculator. Paste ingredients, a URL, or a photo to get instant calories, macros, and 20+ micronutrients per serving.',
+	applicationCategory: 'HealthApplication',
+	operatingSystem: 'Any (web-based)',
+	offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+};
 ---
 
-<Layout>
+<Layout
+	title="Recipe Nutrition Calculator — Free Calorie & Macro Calculator"
+	description="Free recipe nutrition calculator: paste ingredients, a URL, or a photo for an instant recipe calorie calculator breakdown — calories, macros, and 20+ micronutrients per serving. No login, no paywall."
+	structuredData={[appStructuredData, faqStructuredData]}
+>
 	<section class="max-w-[1400px] mx-auto px-md sm:px-lg pt-3xl pb-2xl">
 		<div class="max-w-[720px]">
 			<span class="text-caption-mono text-mute uppercase tracking-wide">Free · No login required</span>
-			<h1 class="text-display-xl text-ink mt-xs">Know exactly what's in your recipe.</h1>
+			<h1 class="text-display-xl text-ink mt-xs">The free Recipe Nutrition Calculator for any recipe.</h1>
 			<p class="text-body-lg text-body mt-sm">
-				Paste a recipe, drop in a link, or snap a photo. Get calories, full macros, and 20+ micronutrients per
-				serving in seconds.
+				Paste a recipe, drop in a link, or snap a photo. This online recipe nutrition calculator gets you
+				calories, full macros, and 20+ micronutrients per serving in seconds — free, with no login.
 			</p>
 		</div>
 	</section>
@@ -86,14 +157,116 @@ const features = [
 	</section>
 
 	<section class="max-w-[1400px] mx-auto px-md sm:px-lg pb-5xl">
-		<h2 class="text-display-lg text-ink mb-lg">Built to be more useful than the alternatives</h2>
+		<h2 class="text-display-lg text-ink mb-lg">How it works</h2>
 		<div class="grid sm:grid-cols-3 gap-lg">
+			{
+				steps.map((s) => (
+					<Card variant="marketing">
+						<span class="text-caption-mono text-mute">{s.n}</span>
+						<h3 class="text-display-sm text-ink mt-xxs mb-xs">{s.title}</h3>
+						<p class="text-body-md text-body">{s.body}</p>
+					</Card>
+				))
+			}
+		</div>
+	</section>
+
+	<section class="max-w-[1400px] mx-auto px-md sm:px-lg pb-5xl">
+		<h2 class="text-display-lg text-ink mb-lg">Built around trust, not guesswork</h2>
+		<div class="grid sm:grid-cols-2 gap-lg">
 			{
 				features.map((f) => (
 					<Card variant="marketing">
 						<h3 class="text-display-sm text-ink mb-xs">{f.title}</h3>
 						<p class="text-body-md text-body">{f.body}</p>
 					</Card>
+				))
+			}
+		</div>
+	</section>
+
+	<section class="max-w-[1400px] mx-auto px-md sm:px-lg pb-5xl">
+		<div class="rounded-lg bg-primary text-on-primary px-lg py-4xl text-center">
+			<p class="text-display-md">20+ micronutrients, calculated for every recipe.</p>
+			<p class="text-body-md opacity-70 mt-sm max-w-[520px] mx-auto">
+				Free and unlimited — no account, no paywalled results, ever.
+			</p>
+			<a
+				href="/how-it-works"
+				class="text-button-lg bg-canvas text-ink rounded-pill px-md h-12 inline-flex items-center mt-lg hover:opacity-90"
+			>
+				See how it works
+			</a>
+		</div>
+	</section>
+
+	<section class="bg-canvas-soft-2">
+		<div class="max-w-[760px] mx-auto px-md sm:px-lg py-5xl space-y-lg">
+			<div>
+				<h2 class="text-display-lg text-ink mb-sm">A closer look at how it works</h2>
+				<p class="text-body-md text-body">
+					What this recipe nutrition calculator actually does, how ingredient matching works, and what "free"
+					means here.
+				</p>
+			</div>
+
+			<div>
+				<h3 class="text-display-sm text-ink mb-xs">What it actually does</h3>
+				<p class="text-body-md text-body">
+					A recipe doesn't come with a nutrition label, so getting real numbers usually means looking up each
+					ingredient by hand and doing the math yourself. This recipe nutrition calculator does that work for
+					you: paste the whole ingredient list — or a URL, or a photo — and get calories, macros, and
+					micronutrients for the entire dish, per serving, in one pass.
+				</p>
+			</div>
+
+			<div>
+				<h3 class="text-display-sm text-ink mb-xs">How ingredient matching works</h3>
+				<p class="text-body-md text-body">
+					Each line is parsed for quantity, unit, and ingredient name, then converted to a common weight —
+					cups and tablespoons use ingredient-specific density where we have it, not a generic assumption.
+					The ingredient is then matched against a curated, USDA-derived database. A low-confidence match is
+					labeled on the line, and anything we can't match at all falls back to an AI estimate rather than
+					being silently skipped.
+				</p>
+			</div>
+
+			<div>
+				<h3 class="text-display-sm text-ink mb-xs">What "free" means here</h3>
+				<p class="text-body-md text-body">
+					Plenty of tools call themselves a free recipe calorie calculator right up until the results page,
+					then meter how many calculations you get or paywall the micronutrient detail. There's none of that
+					here — every recipe you run through gets the full breakdown, and every result comes with a
+					shareable link, automatically, with no account required to generate or view it.
+				</p>
+			</div>
+
+			<div>
+				<h3 class="text-display-sm text-ink mb-xs">Who it's built for</h3>
+				<p class="text-body-md text-body">
+					Home cooks logging a homemade meal, meal-preppers who need an accurate per-serving count before
+					portioning containers, anyone watching sodium or sugar for a health condition, and recipe bloggers
+					who need nutrition facts for a post all use the same tool the same way — paste it in, get the
+					numbers, share the link if you need to.
+				</p>
+			</div>
+		</div>
+	</section>
+
+	<section class="max-w-[760px] mx-auto px-md sm:px-lg py-5xl">
+		<h2 class="text-display-lg text-ink mb-lg">Frequently asked questions</h2>
+		<div class="border-t border-hairline">
+			{
+				faqs.map((f) => (
+					<details class="group border-b border-hairline py-md [&::details-content]:transition-all">
+						<summary class="flex items-center justify-between gap-md cursor-pointer list-none text-body-md-strong text-ink marker:content-none [&::-webkit-details-marker]:hidden">
+							{f.q}
+							<span class="shrink-0 text-mute text-body-lg leading-none transition-transform duration-150 group-open:rotate-45">
+								+
+							</span>
+						</summary>
+						<p class="text-body-md text-body mt-sm">{f.a}</p>
+					</details>
 				))
 			}
 		</div>

@@ -12,7 +12,15 @@ if (!result) {
 }
 ---
 
-<Layout title={result ? `${result.title} — nutrition facts` : 'Recipe not found'}>
+<Layout
+	title={result ? `${result.title} — Nutrition Facts` : 'Recipe not found'}
+	description={
+		result
+			? `Calories, macros, and micronutrients for ${result.title}, calculated with the free Recipe Nutrition Calculator.`
+			: 'This shared recipe nutrition result could not be found.'
+	}
+	noindex
+>
 	<section class="max-w-[1400px] mx-auto px-md sm:px-lg py-3xl">
 		{
 			result ? (
