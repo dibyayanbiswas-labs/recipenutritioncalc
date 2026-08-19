@@ -1,13 +1,27 @@
 // Hand-written service worker (no build step / Workbox) — bump these version suffixes
 // whenever the caching strategy below changes, to force old caches to be dropped on activate.
-const STATIC_CACHE = 'rnc-static-v1';
+const STATIC_CACHE = 'rnc-static-v3';
 const PAGES_CACHE = 'rnc-pages-v1';
 
-const PRECACHE_URLS = ['/offline.html', '/manifest.webmanifest', '/favicon.svg', '/favicon.ico', '/icons/icon-192.png', '/icons/icon-512.png'];
+const PRECACHE_URLS = [
+	'/offline.html',
+	'/site.webmanifest',
+	'/favicon.svg',
+	'/favicon.ico',
+	'/favicon-96x96.png',
+	'/apple-touch-icon.png',
+	'/web-app-manifest-192x192.png',
+	'/web-app-manifest-512x512.png',
+];
 
-// Content-hashed build output (/_astro/*) and other local static files — safe to cache-first
-// since a changed file always gets a new URL.
-const STATIC_ASSET_RE = /\/_astro\/|\/icons\/|\.(?:png|jpe?g|svg|webp|gif|woff2?|ico)$/;
+// Content-hashed build output (/_astro/*) — safe to cache-first since a changed file always
+// gets a new URL.
+const STATIC_ASSET_RE = /\/_astro\//;
+
+// Unhashed root-level icons/manifest (favicon.*, apple-touch-icon.png, web-app-manifest-*.png,
+// site.webmanifest) — same URL can point at different bytes after a favicon regeneration, so
+// these must go network-first rather than cache-first, or a stale icon sticks around forever.
+const ICON_ASSET_RE = /\.(?:png|jpe?g|svg|webp|gif|woff2?|ico|webmanifest)$/;
 
 self.addEventListener('install', (event) => {
 	event.waitUntil(
@@ -50,6 +64,19 @@ async function cacheFirst(request) {
 	return response;
 }
 
+async function networkFirstAsset(request) {
+	const cache = await caches.open(STATIC_CACHE);
+	try {
+		const response = await fetch(request);
+		if (response && response.ok) cache.put(request, response.clone());
+		return response;
+	} catch {
+		const cached = await cache.match(request);
+		if (cached) return cached;
+		throw new Error('asset unavailable offline');
+	}
+}
+
 self.addEventListener('fetch', (event) => {
 	const { request } = event;
 
@@ -66,5 +93,10 @@ self.addEventListener('fetch', (event) => {
 
 	if (STATIC_ASSET_RE.test(url.pathname)) {
 		event.respondWith(cacheFirst(request));
+		return;
+	}
+
+	if (ICON_ASSET_RE.test(url.pathname)) {
+		event.respondWith(networkFirstAsset(request));
 	}
 });

@@ -2,13 +2,122 @@
 import ThemeToggle from '../ui/ThemeToggle.astro';
 ---
 
-<header class="h-16 border-b border-hairline bg-canvas print:hidden">
+<header class="sticky top-0 z-50 h-16 border-b border-hairline bg-canvas/85 backdrop-blur-md print:hidden">
 	<div class="max-w-[1400px] mx-auto h-full px-md sm:px-lg flex items-center justify-between">
 		<a href="/" class="text-body-sm-strong text-ink flex items-center gap-xs">
-			<span
-				class="size-6 rounded-sm bg-primary text-on-primary flex items-center justify-center text-caption font-semibold"
-				>N</span
+			<svg
+				class="h-8 w-auto"
+				viewBox="0 0 580 850"
+				xmlns="http://www.w3.org/2000/svg"
+				aria-hidden="true"
 			>
+				<path
+					d="M276 185
+       L276 145
+       C260 137 251 119 251 92
+       L251 28
+       C251 9 264 0 290 0
+       C316 0 329 9 329 28
+       L329 92
+       C329 119 320 137 304 145
+       L304 185 Z"
+					fill="#17191C"
+				/>
+				<circle cx="290" cy="465" r="275" fill="#17191C" />
+				<circle cx="290" cy="465" r="247" fill="none" stroke="#D5D9DD" stroke-width="12" />
+				<circle cx="290" cy="465" r="217" fill="#1B1D20" />
+				<path
+					d="M91 575
+       C128 655 202 705 290 705
+       C378 705 452 655 489 575"
+					fill="none"
+					stroke="#D5D9DD"
+					stroke-width="10"
+					opacity="0.95"
+				/>
+				<path
+					d="M207 840
+       C207 840 197 836 190 824
+       C184 814 183 801 184 785
+       L193 565
+       C193 548 186 538 176 528
+       C157 509 148 486 148 458
+       C148 415 174 381 207 381
+       C240 381 266 415 266 458
+       C266 486 257 509 238 528
+       C228 538 221 548 221 565
+       L230 785
+       C231 801 230 814 224 824
+       C217 836 207 840 207 840 Z"
+					fill="#FFFFFF"
+				/>
+				<path
+					d="M207 397
+       C184 397 166 422 166 458
+       C166 481 174 498 190 514
+       C204 527 211 540 211 563
+       L202 785
+       C202 798 204 806 207 809
+       C210 806 212 798 212 785
+       L203 563
+       C203 540 210 527 224 514
+       C240 498 248 481 248 458
+       C248 422 230 397 207 397 Z"
+					fill="#17191C"
+				/>
+				<path
+					d="M382 385
+       C374 385 370 391 370 400
+       L370 466
+       C370 478 365 488 356 496
+       C346 505 341 518 341 536
+       L350 785
+       C351 802 350 815 356 826
+       C362 837 371 840 382 840
+       C393 840 402 837 408 826
+       C414 815 413 802 414 785
+       L423 536
+       C423 518 418 505 408 496
+       C399 488 394 478 394 466
+       L394 400
+       C394 391 390 385 382 385 Z"
+					fill="#FFFFFF"
+				/>
+				<path
+					d="M333 385
+       L333 466
+       C333 475 339 480 346 480
+       C353 480 358 475 358 466
+       L358 385 Z"
+					fill="#FFFFFF"
+				/>
+				<path
+					d="M365 385
+       L365 466
+       C365 475 370 480 377 480
+       C384 480 389 475 389 466
+       L389 385 Z"
+					fill="#FFFFFF"
+				/>
+				<path
+					d="M397 385
+       L397 466
+       C397 475 402 480 409 480
+       C416 480 421 475 421 466
+       L421 385 Z"
+					fill="#FFFFFF"
+				/>
+				<path
+					d="M382 496
+       C368 496 359 509 359 530
+       L368 785
+       C368 799 373 809 382 809
+       C391 809 396 799 396 785
+       L405 530
+       C405 509 396 496 382 496 Z"
+					fill="#17191C"
+				/>
+			</svg>
 			Recipe Nutrition Calculator
 		</a>
 		<nav class="hidden md:flex items-center gap-sm text-body-sm text-body">

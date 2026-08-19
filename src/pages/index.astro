@@ -101,6 +101,22 @@ const faqs = [
 		q: 'How is this different from a calculator that only shows calories?',
 		a: 'Most free recipe calorie calculators stop at calories, protein, carbs, and fat. This one adds 20+ micronutrients and a health score, so you get a complete picture, not just a calorie count.',
 	},
+	{
+		q: 'How is nutrition from a recipe calculated?',
+		a: 'Each ingredient line is parsed for quantity, unit, and name, converted to grams, then matched against a USDA-derived nutrition database. Matched values are summed and divided across your servings. See how it works for the full breakdown of parsing, unit conversion, and matching.',
+	},
+	{
+		q: 'Can I take a picture of a recipe and get its nutrition?',
+		a: 'Yes — upload a photo of a printed or handwritten recipe and it\'s transcribed and parsed the same way as pasted text, then run through the same database matching and calculation.',
+	},
+	{
+		q: 'Is this completely AI calculated?',
+		a: 'No. Nutrition values are matched against a USDA-derived database first. AI is only used as a fallback when an ingredient isn\'t in that database, and those lines are clearly flagged as AI-estimated rather than blended in silently.',
+	},
+	{
+		q: 'How will this help me?',
+		a: 'It gives you an accurate per-serving nutrition breakdown in seconds instead of manually looking up and summing each ingredient — useful for portioning meal prep, tracking sodium or sugar, or adding nutrition facts to a recipe post.',
+	},
 ];
 
 const faqStructuredData = {
@@ -112,6 +128,15 @@ const faqStructuredData = {
 		acceptedAnswer: { '@type': 'Answer', text: f.a },
 	})),
 };
+
+function slugify(text: string) {
+	return text
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/(^-|-$)/g, '');
+}
+
+const faqsWithSlug = faqs.map((f) => ({ ...f, slug: slugify(f.q) }));
 
 const appStructuredData = {
 	'@context': 'https://schema.org',
@@ -255,11 +280,26 @@ const appStructuredData = {
 
 	<section class="max-w-[760px] mx-auto px-md sm:px-lg py-5xl">
 		<h2 class="text-display-lg text-ink mb-lg">Frequently asked questions</h2>
+		<nav aria-label="FAQ navigation" class="flex flex-wrap gap-xs mb-lg">
+			{
+				faqsWithSlug.map((f) => (
+					<a
+						href={`#${f.slug}`}
+						class="rounded-full border border-hairline px-sm py-xs text-body-sm text-body hover:text-ink hover:bg-canvas-soft"
+					>
+						{f.q}
+					</a>
+				))
+			}
+		</nav>
 		<div class="border-t border-hairline">
 			{
-				faqs.map((f) => (
+				faqsWithSlug.map((f) => (
 					<details class="group border-b border-hairline py-md [&::details-content]:transition-all">
-						<summary class="flex items-center justify-between gap-md cursor-pointer list-none text-body-md-strong text-ink marker:content-none [&::-webkit-details-marker]:hidden">
+						<summary
+							id={f.slug}
+							class="scroll-mt-24 flex items-center justify-between gap-md cursor-pointer list-none text-body-md-strong text-ink marker:content-none [&::-webkit-details-marker]:hidden"
+						>
 							{f.q}
 							<span class="shrink-0 text-mute text-body-lg leading-none transition-transform duration-150 group-open:rotate-45">
 								+
@@ -271,4 +311,22 @@ const appStructuredData = {
 			}
 		</div>
 	</section>
+
+	<script>
+		function openFaqFromHash() {
+			const id = window.location.hash.slice(1);
+			if (!id) return;
+			document.getElementById(id)?.closest('details')?.setAttribute('open', '');
+		}
+
+		document.querySelectorAll<HTMLAnchorElement>('nav[aria-label="FAQ navigation"] a').forEach((link) => {
+			link.addEventListener('click', () => {
+				const id = link.getAttribute('href')?.slice(1);
+				if (id) document.getElementById(id)?.closest('details')?.setAttribute('open', '');
+			});
+		});
+
+		openFaqFromHash();
+		window.addEventListener('hashchange', openFaqFromHash);
+	</script>
 </Layout>

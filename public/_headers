@@ -1,5 +1,23 @@
 /sw.js
   Cache-Control: no-cache
 
-/manifest.webmanifest
+/site.webmanifest
+  Cache-Control: public, max-age=0, must-revalidate
+
+/favicon.ico
+  Cache-Control: public, max-age=0, must-revalidate
+
+/favicon.svg
+  Cache-Control: public, max-age=0, must-revalidate
+
+/favicon-96x96.png
+  Cache-Control: public, max-age=0, must-revalidate
+
+/apple-touch-icon.png
+  Cache-Control: public, max-age=0, must-revalidate
+
+/web-app-manifest-192x192.png
+  Cache-Control: public, max-age=0, must-revalidate
+
+/web-app-manifest-512x512.png
   Cache-Control: public, max-age=0, must-revalidate
