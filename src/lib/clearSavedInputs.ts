@@ -1,17 +1,9 @@
-const STORAGE_KEYS = [
-	'recipeCalc:pasteTitle',
-	'recipeCalc:pasteServings',
-	'recipeCalc:pasteText',
-	'recipeCalc:url',
-	'recipeCalc:urlServings',
-];
-
-/** Clears every saved input field and sends the user back to a blank home page. */
-export function startOver(): void {
+/** Clears one saved input field. Used by each form's "Start over" button, which only empties
+ *  that form's content so the user can start a new entry without losing title/servings. */
+export function clearSavedInput(key: string): void {
 	try {
-		STORAGE_KEYS.forEach((k) => sessionStorage.removeItem(k));
+		sessionStorage.removeItem(key);
 	} catch {
 		// sessionStorage can throw in locked-down privacy modes — clearing is best-effort.
 	}
-	window.location.href = '/';
 }

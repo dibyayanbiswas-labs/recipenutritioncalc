@@ -36,6 +36,25 @@ const {
 				}
 			})();
 		</script>
+		<script is:inline>
+			(function () {
+				// A manual browser refresh should behave like "Start over" and drop any in-progress,
+				// unsubmitted form input — only an actual reload qualifies, not a normal navigation
+				// (e.g. the redirect Astro does right after a form submission).
+				try {
+					var nav = performance.getEntriesByType('navigation')[0];
+					if (nav && nav.type === 'reload') {
+						['recipeCalc:pasteTitle', 'recipeCalc:pasteServings', 'recipeCalc:pasteText', 'recipeCalc:url', 'recipeCalc:urlServings'].forEach(
+							function (k) {
+								sessionStorage.removeItem(k);
+							},
+						);
+					}
+				} catch (e) {
+					// sessionStorage/Performance API can throw in locked-down privacy modes — best-effort.
+				}
+			})();
+		</script>
 	</head>
 	<body class="min-h-screen flex flex-col">
 		<NavBar />

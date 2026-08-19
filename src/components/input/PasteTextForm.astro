@@ -14,7 +14,7 @@ const { error = null, value = '', title = '', servings } = Astro.props;
 // Only mark the field "server-filled" when we actually have a value from a submission (success or
 // error) to show back — otherwise the client restore script is free to pull the last-typed value
 // from sessionStorage on a fresh page load.
-const servingsValue = servings ?? 4;
+const servingsValue = servings ?? 1;
 const servingsPrefilled = servings !== undefined;
 ---
 
@@ -68,13 +68,18 @@ const servingsPrefilled = servings !== undefined;
 
 <script>
 	import { checkIngredientTextFormat } from '../../lib/parseIngredients';
-	import { startOver } from '../../lib/clearSavedInputs';
+	import { clearSavedInput } from '../../lib/clearSavedInputs';
 
 	const form = document.getElementById('paste-form') as HTMLFormElement | null;
 	const textarea = document.getElementById('ingredient-textarea') as HTMLTextAreaElement | null;
 	const errorEl = document.getElementById('paste-format-error');
 
-	document.getElementById('paste-start-over')?.addEventListener('click', () => startOver());
+	document.getElementById('paste-start-over')?.addEventListener('click', () => {
+		if (textarea) textarea.value = '';
+		clearSavedInput('recipeCalc:pasteText');
+		errorEl?.classList.add('hidden');
+		textarea?.focus();
+	});
 
 	form?.addEventListener('submit', (e) => {
 		if (!textarea || !errorEl) return;

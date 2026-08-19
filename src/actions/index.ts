@@ -16,7 +16,7 @@ export const server = {
 		accept: 'form',
 		input: z.object({
 			text: z.string().min(1, 'Paste some ingredients first.'),
-			servings: z.coerce.number().min(1).max(100).default(4),
+			servings: z.coerce.number().min(1).max(100).default(1),
 			title: z.string().optional(),
 		}),
 		handler: async ({ text, servings, title }) => {
@@ -72,7 +72,7 @@ export const server = {
 		accept: 'json',
 		input: z.object({
 			title: z.string().optional(),
-			servings: z.coerce.number().min(1).max(100).default(4),
+			servings: z.coerce.number().min(1).max(100).default(1),
 			rows: z
 				.array(
 					z.object({

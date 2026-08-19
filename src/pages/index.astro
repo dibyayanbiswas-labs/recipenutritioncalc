@@ -4,13 +4,37 @@ import Card from '../components/ui/Card.astro';
 import InputTabs from '../components/input/InputTabs.astro';
 import ResultsView from '../components/results/ResultsView.astro';
 import { actions } from 'astro:actions';
+import { loadResult } from '../lib/kv';
+import { env } from 'cloudflare:workers';
+
+interface FormFlash {
+	tab: 'paste' | 'url';
+	error?: string;
+	resultId?: string;
+}
 
 const textResult = Astro.getActionResult(actions.analyzeText);
 const urlResult = Astro.getActionResult(actions.analyzeUrl);
 
-const activeTab: 'paste' | 'url' = urlResult ? 'url' : 'paste';
-const errorResult = textResult?.error ?? urlResult?.error ?? null;
-const nutritionResult = !textResult?.error && textResult?.data ? textResult.data : !urlResult?.error && urlResult?.data ? urlResult.data : null;
+// Post/Redirect/Get: stash the outcome in the session and redirect back to a clean "/" — so a
+// browser refresh just re-loads a blank page instead of resubmitting the form and repeating the
+// same result or error.
+if (textResult) {
+	Astro.session?.set<FormFlash>('formFlash', { tab: 'paste', error: textResult.error?.message, resultId: textResult.data?.id });
+	return Astro.redirect('/');
+}
+if (urlResult) {
+	Astro.session?.set<FormFlash>('formFlash', { tab: 'url', error: urlResult.error?.message, resultId: urlResult.data?.id });
+	return Astro.redirect('/');
+}
+
+const flash = await Astro.session?.get<FormFlash>('formFlash');
+if (flash) Astro.session?.delete('formFlash');
+
+const activeTab: 'paste' | 'url' = flash?.tab ?? 'paste';
+const textError = flash?.tab === 'paste' ? (flash.error ?? null) : null;
+const urlError = flash?.tab === 'url' ? (flash.error ?? null) : null;
+const nutritionResult = flash?.resultId ? await loadResult(env.RESULTS_KV, flash.resultId) : null;
 
 const features = [
 	{
@@ -42,12 +66,7 @@ const features = [
 
 	<section class="max-w-[1400px] mx-auto px-md sm:px-lg pb-4xl">
 		<Card variant="marketing-large">
-			<InputTabs
-				activeTab={activeTab}
-				textError={errorResult?.message ?? null}
-				urlError={urlResult?.error?.message ?? null}
-				pasteServings={!textResult?.error && textResult?.data ? textResult.data.servings : undefined}
-			/>
+			<InputTabs activeTab={activeTab} textError={textError} urlError={urlError} />
 		</Card>
 
 		{

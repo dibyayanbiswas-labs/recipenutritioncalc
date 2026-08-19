@@ -11,7 +11,7 @@ import Button from '../ui/Button.astro';
 		</div>
 		<div>
 			<label for="manual-servings" class="text-body-sm-strong text-ink block mb-xxs">Servings</label>
-			<Input id="manual-servings" name="servings" type="number" value="4" />
+			<Input id="manual-servings" name="servings" type="number" value="1" />
 		</div>
 	</div>
 
@@ -61,9 +61,6 @@ import Button from '../ui/Button.astro';
 
 <script>
 	import { actions } from 'astro:actions';
-	import { startOver } from '../../lib/clearSavedInputs';
-
-	document.getElementById('manual-start-over')?.addEventListener('click', () => startOver());
 
 	const rowsContainer = document.getElementById('manual-rows')!;
 	const template = document.getElementById('row-template') as HTMLTemplateElement;
@@ -71,6 +68,17 @@ import Button from '../ui/Button.astro';
 	const submitBtn = document.getElementById('manual-submit')!;
 	const errorEl = document.getElementById('manual-error')!;
 	const form = document.getElementById('manual-form') as HTMLFormElement;
+
+	document.getElementById('manual-start-over')?.addEventListener('click', () => {
+		rowsContainer.querySelectorAll('[data-row]').forEach((row, i) => {
+			if (i === 0) {
+				row.querySelectorAll('input').forEach((input) => ((input as HTMLInputElement).value = ''));
+			} else {
+				row.remove();
+			}
+		});
+		errorEl.classList.add('hidden');
+	});
 
 	addRowBtn.addEventListener('click', () => {
 		const clone = template.content.cloneNode(true) as DocumentFragment;
@@ -99,7 +107,7 @@ import Button from '../ui/Button.astro';
 		submitBtn.setAttribute('disabled', 'true');
 		const { data, error } = await actions.analyzeManual({
 			title: formData.get('title')?.toString(),
-			servings: Number(formData.get('servings')) || 4,
+			servings: Number(formData.get('servings')) || 1,
 			rows,
 		});
 		submitBtn.removeAttribute('disabled');

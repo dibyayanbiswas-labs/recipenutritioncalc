@@ -32,9 +32,15 @@ const { error = null, value = '' } = Astro.props;
 </form>
 
 <script>
-	import { startOver } from '../../lib/clearSavedInputs';
+	import { clearSavedInput } from '../../lib/clearSavedInputs';
 
-	document.getElementById('url-start-over')?.addEventListener('click', () => startOver());
+	const urlInput = document.getElementById('recipe-url') as HTMLInputElement | null;
+
+	document.getElementById('url-start-over')?.addEventListener('click', () => {
+		if (urlInput) urlInput.value = '';
+		clearSavedInput('recipeCalc:url');
+		urlInput?.focus();
+	});
 
 	const fields = [
 		{ id: 'recipe-url', key: 'recipeCalc:url' },
