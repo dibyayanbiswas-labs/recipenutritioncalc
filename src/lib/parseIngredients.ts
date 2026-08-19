@@ -69,6 +69,18 @@ const WORD_NUMBERS: Record<string, number> = {
 	ten: 10,
 };
 
+// Fixed, self-contained word phrases with a conventional count — distinct from WORD_NUMBERS since
+// each is checked as a whole "(a/an) WORD (of)?" phrase, not a single word, and must be tried before
+// the bare "a"/"an" = 1 fallback below (otherwise "a dozen eggs" would stop at "a" = 1).
+const MULTIPLIER_WORDS: Record<string, number> = { dozen: 12, couple: 2, few: 3 };
+const MULTIPLIER_WORD_PATTERN = new RegExp(`^(?:(?:a|an)\\s+)?(${Object.keys(MULTIPLIER_WORDS).join('|')})\\s+(?:of\\s+)?`, 'i');
+
+function extractMultiplierWordQuantity(text: string): { quantity: number; rest: string } | null {
+	const match = text.match(MULTIPLIER_WORD_PATTERN);
+	if (!match) return null;
+	return { quantity: MULTIPLIER_WORDS[match[1].toLowerCase()], rest: text.slice(match[0].length) };
+}
+
 function extractQuantity(text: string): {
 	quantity: number | null;
 	quantityRange: [number, number] | null;
@@ -88,6 +100,17 @@ function extractQuantity(text: string): {
 		}
 	}
 
+	// Multiplier: "2 x 400g", "3 x 500 ml" — total quantity is the product; the unit (if any) is
+	// left in `rest` for the normal extractUnit() pass right after this returns.
+	const multiplierMatch = text.match(new RegExp(`^(\\d+(?:\\.\\d+)?)\\s*[x×]\\s*(${QUANTITY_TOKEN})(?:\\s+|$)`, 'i'));
+	if (multiplierMatch) {
+		const count = Number(multiplierMatch[1]);
+		const each = parseQuantityToken(multiplierMatch[2]);
+		if (each !== null) {
+			return { quantity: count * each, quantityRange: null, rest: text.slice(multiplierMatch[0].length) };
+		}
+	}
+
 	// Single quantity token — followed by whitespace, or the end of the string ("500" with nothing after).
 	const singleMatch = text.match(new RegExp(`^(${QUANTITY_TOKEN})(?:\\s+|$)`));
 	if (singleMatch) {
@@ -95,6 +118,13 @@ function extractQuantity(text: string): {
 		if (q !== null) {
 			return { quantity: q, quantityRange: null, rest: text.slice(singleMatch[0].length) };
 		}
+	}
+
+	// Fixed multiplier phrases, e.g. "a dozen eggs", "couple of onions", "a few sprigs" — tried before
+	// the bare word-number fallback below so "a dozen" doesn't stop early at "a" = 1.
+	const multiplierWord = extractMultiplierWordQuantity(text);
+	if (multiplierWord) {
+		return { quantity: multiplierWord.quantity, quantityRange: null, rest: multiplierWord.rest };
 	}
 
 	// Word number fallback, e.g. "a pinch of salt", "two eggs"
@@ -110,39 +140,66 @@ function extractQuantity(text: string): {
 	return { quantity: null, quantityRange: null, rest: text };
 }
 
-/** Same idea as extractQuantity, but anchored to the END of the string — for "basmati rice 500 g" (name-then-amount). */
-function extractQuantityUnitFromEnd(text: string): { quantity: number; unit: string | null; rest: string } | null {
-	const match = text.match(new RegExp(`(${QUANTITY_TOKEN})\\s*(${UNIT_ALIAS_PATTERN})?\\s*$`, 'i'));
-	if (!match) return null;
-	const quantity = parseQuantityToken(match[1]);
-	if (quantity === null) return null;
-
-	let unit: string | null = null;
-	if (match[2]) {
-		const alias = match[2].toLowerCase();
-		const def = UNIT_TABLE[alias] ?? UNIT_TABLE[match[2]];
-		if (def) unit = def.canonical;
-	}
-
-	// Strip a trailing "name - " / "name: " connector, e.g. "Chicken breast - 500 g", "Rice: 2 cups".
-	const rest = text
-		.slice(0, match.index)
-		.replace(/[\s]*[-:–—][\s]*$/, '')
-		.trim();
-	if (!rest) return null; // nothing left to call an ingredient name — not a useful match
-	return { quantity, unit, rest };
-}
-
 function extractUnit(text: string): { unit: string | null; rest: string } {
 	const match = text.match(new RegExp(`^(${UNIT_ALIAS_PATTERN})\\b\\.?(?:\\s+|$)`, 'i'));
 	if (match) {
-		const alias = match[1].toLowerCase();
-		const def = UNIT_TABLE[alias] ?? UNIT_TABLE[match[1]];
+		// Exact case checked first: "T" (tablespoon) and "t" (teaspoon) are distinct, meaningful
+		// aliases — lowercasing before the lookup would collapse both onto "t" (teaspoon) always.
+		const def = UNIT_TABLE[match[1]] ?? UNIT_TABLE[match[1].toLowerCase()];
 		if (def) {
 			return { unit: def.canonical, rest: text.slice(match[0].length) };
 		}
 	}
 	return { unit: null, rest: text };
+}
+
+/** A separator only counts as a "name — amount" divider when it has whitespace around a dash/em-dash,
+ * or immediately follows a colon — so a compound word like "stir-fry" is never mistaken for one. */
+const NAME_FIRST_SEPARATOR = /^(.+?)(?:\s+[-–—]\s+|:\s*)(.+)$/;
+
+/** Fallback for lines that don't start with a quantity: "Chicken breast - 500 g", "Rice: 2 cups",
+ * "Onion — 1 medium (150 g), finely chopped". Splits at the connector, then parses the right-hand
+ * side with the exact same front-anchored logic as a normal line — so anything after the amount
+ * (parens, commas, trailing prep notes) is handled uniformly, instead of requiring the amount to be
+ * the very last thing on the line. */
+function extractNameFirstQuantity(
+	text: string,
+): { name: string; quantity: number; quantityRange: [number, number] | null; unit: string | null; rest: string } | null {
+	const match = text.match(NAME_FIRST_SEPARATOR);
+	if (!match) return null;
+	const [, name, afterSeparator] = match;
+	const { quantity, quantityRange, rest: afterQuantity } = extractQuantity(afterSeparator);
+	if (quantity === null) return null;
+	const { unit, rest } = extractUnit(afterQuantity);
+	return { name: name.trim(), quantity, quantityRange, unit, rest };
+}
+
+/** A parenthetical giving an explicit weight/volume, e.g. "(150 g)" or "(80–100 g)", is more
+ * reliable than a count-based amount read elsewhere on the line ("1 medium", "4 slices") — when
+ * present it becomes the ingredient's quantity+unit outright, instead of a generic per-count guess. */
+function extractWeightOverride(
+	text: string,
+): { text: string; quantity: number; quantityRange: [number, number] | null; unit: string } | null {
+	const pattern = new RegExp(
+		`\\(\\s*(${QUANTITY_TOKEN})(?:\\s*(?:-|–|to)\\s*(${QUANTITY_TOKEN}))?\\s*(${UNIT_ALIAS_PATTERN})\\s*\\)`,
+		'i',
+	);
+	const match = text.match(pattern);
+	if (!match) return null;
+
+	const unitDef = UNIT_TABLE[match[3]] ?? UNIT_TABLE[match[3].toLowerCase()];
+	if (!unitDef || unitDef.unitClass === 'count') return null; // only a weight/volume figure is worth overriding with
+
+	const a = parseQuantityToken(match[1]);
+	if (a === null) return null;
+	const b = match[2] ? parseQuantityToken(match[2]) : null;
+
+	return {
+		text: (text.slice(0, match.index) + text.slice((match.index ?? 0) + match[0].length)).replace(/\s+/g, ' ').trim(),
+		quantity: b !== null ? (a + b) / 2 : a,
+		quantityRange: b !== null ? [a, b] : null,
+		unit: unitDef.canonical,
+	};
 }
 
 // Preparation words that describe how an ingredient was cut/handled rather than what it is —
@@ -240,81 +297,60 @@ function isSectionHeadingLine(line: string): boolean {
 	return letters.length >= 3 && trimmed === trimmed.toUpperCase();
 }
 
-/** True if the whole line is nothing but a quantity (+ optional unit) — e.g. "500g" on its own line. */
-function isQuantityOnlyLine(line: string): boolean {
-	const { quantity, rest } = extractQuantity(line);
-	if (quantity === null) return false;
-	const { rest: afterUnit } = extractUnit(rest.trim());
-	return afterUnit.trim().length === 0;
+/** Fallback for a whole ingredient list pasted as one comma-separated line instead of one per line,
+ * e.g. "500g chicken, 2 cups rice, 1 tbsp olive oil". Deliberately narrow: it only fires when EVERY
+ * resulting segment has its own detectable amount — so a single ingredient whose own comma is just a
+ * prep note ("1 onion, chopped") is left alone, since "chopped" has no amount of its own. */
+function splitCommaSeparatedIngredients(line: string): string[] {
+	if (!line.includes(',')) return [line];
+	const segments = line
+		.split(',')
+		.map((s) => s.trim())
+		.filter((s) => s.length > 0);
+	if (segments.length < 2) return [line];
+
+	const eachHasAmount = segments.every((s) => extractQuantity(s).quantity !== null || extractNameFirstQuantity(s) !== null);
+	return eachHasAmount ? segments : [line];
 }
 
-/** Splits a line that turns out to contain several "name amount unit" ingredients run together
- * (e.g. after normalizeSpacing collapses "basmati rice500g chicken500g" onto one line) into one
- * chunk per amount, each ending right after its unit. Only called on lines that don't already
- * start with a quantity, so normal "2 cups flour" lines are never touched by this. */
-function splitConcatenatedIngredients(line: string): string[] {
-	// The QUANTITY_TOKEN alternation only matches actual numeric/fraction text, so every match here
-	// is already a valid amount — no extra validation needed.
-	const re = new RegExp(`(?:${QUANTITY_TOKEN})\\s*(?:${UNIT_ALIAS_PATTERN})?`, 'gi');
-	const matches = [...line.matchAll(re)];
-	if (matches.length <= 1) return [line];
-
-	const chunks: string[] = [];
-	let cursor = 0;
-	for (const m of matches) {
-		const end = (m.index ?? 0) + m[0].length;
-		chunks.push(line.slice(cursor, end).trim());
-		cursor = end;
-	}
-	const trailing = line.slice(cursor).trim();
-	if (trailing && chunks.length > 0) chunks[chunks.length - 1] += ' ' + trailing;
-	return chunks.filter((c) => c.length > 0);
-}
-
-/** Splits freeform recipe text (or OCR output) into individual candidate ingredient lines, tolerating
- * a few common malformed pastes: name and amount on separate lines, or a whole recipe run together
- * with no separators at all ("basmati rice500g chicken500g"). */
+/** Splits freeform recipe text into candidate ingredient lines. Hard rule: one line in -> at most
+ * one ingredient out. No cross-line merging, no splitting one line into several based on a guess —
+ * the sole, deliberate exception is a whole comma-separated list pasted onto one line, which only
+ * splits when every resulting piece unambiguously has its own amount (see above). Nothing else here
+ * tries to fix up a malformed paste, since that guessing is what produced unpredictable results. */
 export function splitIntoLines(text: string): string[] {
-	const rawLines = normalizeSpacing(text)
+	return normalizeSpacing(text)
 		.split(/\r?\n/)
 		.map((l) => l.trim())
 		.filter((l) => l.length > 0)
-		.map((l) => l.replace(/^[-*•]\s*/, '').replace(/^\d+[.)]\s*/, ''))
-		.filter((l) => !isSectionHeadingLine(l));
-
-	// "basmati rice" / "500g" on consecutive lines -> merge into "basmati rice 500g".
-	const merged: string[] = [];
-	for (const line of rawLines) {
-		const prev = merged[merged.length - 1];
-		if (isQuantityOnlyLine(line) && prev !== undefined && extractQuantity(prev).quantity === null) {
-			merged[merged.length - 1] = `${prev} ${line}`;
-		} else {
-			merged.push(line);
-		}
-	}
-
-	// A line that already parses as quantity-first ("2 cups flour") is left alone. Only lines that
-	// don't start with a quantity get checked for multiple concatenated ingredients.
-	const final: string[] = [];
-	for (const line of merged) {
-		if (extractQuantity(line).quantity !== null) {
-			final.push(line);
-		} else {
-			final.push(...splitConcatenatedIngredients(line));
-		}
-	}
-	return final;
+		// The `.` branch requires the period NOT be followed by a digit, so a decimal quantity like
+		// "1.5 scoops" is left alone instead of being misread as a "1. " numbered-list marker.
+		.map((l) => l.replace(/^[-*•]\s*/, '').replace(/^\d+(?:\.(?!\d)|\))\s*/, ''))
+		.map((l) => l.replace(/[,;]+\s*$/, '').trim()) // trailing "2 cups oats," -> "2 cups oats"
+		.filter((l) => l.length > 0)
+		.filter((l) => !isSectionHeadingLine(l))
+		.flatMap((l) => splitCommaSeparatedIngredients(l));
 }
 
 /** Parses a single ingredient line into quantity/unit/name/notes. Tries "amount name" first
  * (the primary supported format), then falls back to "name amount" for lines that don't start
- * with a quantity at all. */
+ * with a quantity at all. A parenthetical explicit weight, if present, always wins for the final
+ * quantity+unit — see extractWeightOverride. */
+// A leading approximation marker ("About 1 cup", "~200g", "approx. 2 tbsp") would otherwise block
+// quantity extraction entirely, since none of it is a digit/fraction/word-number — stripped before
+// anything else runs so the amount underneath still parses normally.
+const APPROX_PREFIX = /^(?:about|approx\.?|approximately)\s+|^~\s*/i;
+
 export function parseIngredientLine(raw: string): ParsedIngredientLine {
-	let working = raw.trim();
+	let working = raw.trim().replace(APPROX_PREFIX, '');
 	const isOptionalOrToTaste = detectOptional(working);
+
+	const weightOverride = extractWeightOverride(working);
+	if (weightOverride) working = weightOverride.text;
 
 	let { quantity, quantityRange, rest: afterQuantity } = extractQuantity(working);
 	let unit: string | null = null;
+	let nameFirst: string | null = null;
 
 	if (quantity !== null) {
 		working = afterQuantity;
@@ -322,11 +358,13 @@ export function parseIngredientLine(raw: string): ParsedIngredientLine {
 		unit = extractedUnit.unit;
 		working = extractedUnit.rest;
 	} else {
-		const fromEnd = extractQuantityUnitFromEnd(working);
-		if (fromEnd) {
-			quantity = fromEnd.quantity;
-			unit = fromEnd.unit;
-			working = fromEnd.rest;
+		const fromName = extractNameFirstQuantity(working);
+		if (fromName) {
+			quantity = fromName.quantity;
+			quantityRange = fromName.quantityRange;
+			unit = fromName.unit;
+			working = fromName.rest;
+			nameFirst = fromName.name;
 		}
 	}
 
@@ -342,14 +380,43 @@ export function parseIngredientLine(raw: string): ParsedIngredientLine {
 		working = working.trim();
 	}
 
-	const { text: ingredientName, notes } = extractNotes(working);
+	const { text: leftoverName, notes: leftoverNotes } = extractNotes(working);
+
+	// When the food name came from before a "name — amount" separator, anything left over after
+	// pulling the amount out of the right-hand side (e.g. "medium" from "1 medium (150 g)") is a
+	// descriptor, not the name — it goes into notes instead of overwriting the real name.
+	let ingredientName: string;
+	let notes: string | null;
+	if (nameFirst) {
+		ingredientName = nameFirst;
+		notes = [leftoverName, leftoverNotes].filter((s) => s && s.length > 0).join(', ') || null;
+	} else {
+		ingredientName = leftoverName || working.trim();
+		notes = leftoverNotes;
+	}
+
+	if (weightOverride) {
+		quantity = weightOverride.quantity;
+		quantityRange = weightOverride.quantityRange;
+		unit = weightOverride.unit;
+	}
+
+	// "Butter or margarine" -> match on "butter" alone; the alternative is noted, not merged into a
+	// two-food query that would never match anything as a single entry. Doesn't handle a shared
+	// trailing word ("orange or lemon zest") — a narrow, deliberate limitation, not a general "or"
+	// grammar parser.
+	const orMatch = ingredientName.match(/^(.+?)\s+or\s+(.+)$/i);
+	if (orMatch) {
+		ingredientName = orMatch[1].trim();
+		notes = [notes, `or ${orMatch[2].trim()}`].filter((s) => s && s.length > 0).join(', ') || null;
+	}
 
 	return {
 		raw,
 		quantity,
 		quantityRange,
 		unit,
-		ingredientName: ingredientName || working.trim(),
+		ingredientName,
 		notes,
 		isOptionalOrToTaste,
 	};
@@ -386,7 +453,7 @@ export function checkIngredientTextFormat(text: string): FormatCheckResult {
 		return {
 			ok: false,
 			reason:
-				"We couldn't find an amount for most of these lines. Try one ingredient per line, formatted as \"amount unit ingredient\" — for example \"500g basmati rice\" or \"2 cups flour\".",
+				'We couldn\'t find an amount on most lines. Each line needs to be one ingredient, written as "amount unit ingredient" — for example "500g basmati rice" or "2 cups flour".',
 			unparsedExamples: unparsed.slice(0, 3).map((l) => l.raw),
 		};
 	}

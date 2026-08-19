@@ -3,7 +3,8 @@ import Layout from '../layouts/Layout.astro';
 import Card from '../components/ui/Card.astro';
 import InputTabs from '../components/input/InputTabs.astro';
 import ResultsView from '../components/results/ResultsView.astro';
-import { actions } from 'astro:actions';
+import { actions, isInputError } from 'astro:actions';
+import type { ActionError } from 'astro:actions';
 import { loadResult } from '../lib/kv';
 import { env } from 'cloudflare:workers';
 
@@ -11,6 +12,18 @@ interface FormFlash {
 	tab: 'paste' | 'url' | 'manual';
 	error?: string;
 	resultId?: string;
+}
+
+/** `ActionInputError.message` is a raw JSON dump of every Zod issue, meant for developers, not end
+ * users — the friendly per-field message we actually want lives in `.fields` instead. A plain
+ * ActionError (e.g. the handler's own "add at least one ingredient" check) has no `.fields`, so
+ * `.message` is already the right thing to show as-is. */
+function actionErrorMessage(error: ActionError | undefined, primaryField: string): string | undefined {
+	if (!error) return undefined;
+	if (isInputError(error)) {
+		return (error.fields[primaryField]?.[0] ?? Object.values(error.fields)[0]?.[0]) ?? error.message;
+	}
+	return error.message;
 }
 
 const textResult = Astro.getActionResult(actions.analyzeText);
@@ -22,22 +35,34 @@ const manualResult = Astro.getActionResult(actions.analyzeManual);
 // same result or error. Only one flash is ever stored, so whichever tab was just calculated is
 // the only result shown — it replaces anything calculated from another tab before it.
 if (textResult) {
-	Astro.session?.set<FormFlash>('formFlash', { tab: 'paste', error: textResult.error?.message, resultId: textResult.data?.id });
+	Astro.session?.set<FormFlash>('formFlash', {
+		tab: 'paste',
+		error: actionErrorMessage(textResult.error, 'text'),
+		resultId: textResult.data?.id,
+	});
 	return Astro.redirect('/');
 }
 if (urlResult) {
-	Astro.session?.set<FormFlash>('formFlash', { tab: 'url', error: urlResult.error?.message, resultId: urlResult.data?.id });
+	Astro.session?.set<FormFlash>('formFlash', {
+		tab: 'url',
+		error: actionErrorMessage(urlResult.error, 'url'),
+		resultId: urlResult.data?.id,
+	});
 	return Astro.redirect('/');
 }
 if (manualResult) {
-	Astro.session?.set<FormFlash>('formFlash', { tab: 'manual', error: manualResult.error?.message, resultId: manualResult.data?.id });
+	Astro.session?.set<FormFlash>('formFlash', {
+		tab: 'manual',
+		error: actionErrorMessage(manualResult.error, 'name'),
+		resultId: manualResult.data?.id,
+	});
 	return Astro.redirect('/');
 }
 
 const flash = await Astro.session?.get<FormFlash>('formFlash');
 if (flash) Astro.session?.delete('formFlash');
 
-const activeTab: 'paste' | 'url' | 'manual' = flash?.tab ?? 'paste';
+const activeTab: 'paste' | 'url' | 'manual' = flash?.tab ?? 'manual';
 const textError = flash?.tab === 'paste' ? (flash.error ?? null) : null;
 const urlError = flash?.tab === 'url' ? (flash.error ?? null) : null;
 const manualError = flash?.tab === 'manual' ? (flash.error ?? null) : null;

@@ -15,7 +15,10 @@ export const server = {
 	analyzeText: defineAction({
 		accept: 'form',
 		input: z.object({
-			text: z.string().min(1, 'Paste some ingredients first.'),
+			// Astro's form-data parsing turns an empty-string field into `null` before Zod ever sees it,
+			// which would otherwise fail the base `z.string()` check with a raw "expected string,
+			// received null" error instead of the friendly message below — preprocess it back to ''.
+			text: z.preprocess((v) => v ?? '', z.string().min(1, 'Paste some ingredients first.')),
 			servings: z.coerce.number().min(1).max(100).default(1),
 			title: z.string().optional(),
 		}),
@@ -43,7 +46,8 @@ export const server = {
 	analyzeUrl: defineAction({
 		accept: 'form',
 		input: z.object({
-			url: z.url('Enter a valid recipe URL.'),
+			// Same empty-field-becomes-null issue as analyzeText.text — see the comment there.
+			url: z.preprocess((v) => v ?? '', z.url('Enter a valid recipe URL.')),
 			servingsOverride: z.coerce.number().min(1).max(100).optional(),
 		}),
 		handler: async ({ url, servingsOverride }) => {

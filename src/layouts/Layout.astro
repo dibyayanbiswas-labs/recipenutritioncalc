@@ -89,11 +89,18 @@ const jsonLdBlocks = structuredData ? (Array.isArray(structuredData) ? structure
 				try {
 					var nav = performance.getEntriesByType('navigation')[0];
 					if (nav && nav.type === 'reload') {
-						['recipeCalc:pasteTitle', 'recipeCalc:pasteServings', 'recipeCalc:pasteText', 'recipeCalc:url', 'recipeCalc:urlServings'].forEach(
-							function (k) {
-								sessionStorage.removeItem(k);
-							},
-						);
+						[
+							'recipeCalc:pasteTitle',
+							'recipeCalc:pasteServings',
+							'recipeCalc:pasteText',
+							'recipeCalc:url',
+							'recipeCalc:urlServings',
+							'recipeCalc:manualRows',
+							'recipeCalc:manualTitle',
+							'recipeCalc:manualServings',
+						].forEach(function (k) {
+							sessionStorage.removeItem(k);
+						});
 					}
 				} catch (e) {
 					// sessionStorage/Performance API can throw in locked-down privacy modes — best-effort.

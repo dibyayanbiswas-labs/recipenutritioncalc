@@ -55,6 +55,8 @@ export const UNIT_TABLE: Record<string, UnitDef> = {
 
 	piece: { canonical: 'count', unitClass: 'count', toBase: 1 },
 	pieces: { canonical: 'count', unitClass: 'count', toBase: 1 },
+	scoop: { canonical: 'scoop', unitClass: 'count', toBase: 1 },
+	scoops: { canonical: 'scoop', unitClass: 'count', toBase: 1 },
 	clove: { canonical: 'count', unitClass: 'count', toBase: 1 },
 	cloves: { canonical: 'count', unitClass: 'count', toBase: 1 },
 	slice: { canonical: 'count', unitClass: 'count', toBase: 1 },
@@ -63,6 +65,12 @@ export const UNIT_TABLE: Record<string, UnitDef> = {
 	cans: { canonical: 'count', unitClass: 'count', toBase: 1 },
 	stalk: { canonical: 'count', unitClass: 'count', toBase: 1 },
 	stalks: { canonical: 'count', unitClass: 'count', toBase: 1 },
+	packet: { canonical: 'count', unitClass: 'count', toBase: 1 },
+	packets: { canonical: 'count', unitClass: 'count', toBase: 1 },
+	container: { canonical: 'count', unitClass: 'count', toBase: 1 },
+	containers: { canonical: 'count', unitClass: 'count', toBase: 1 },
+	box: { canonical: 'count', unitClass: 'count', toBase: 1 },
+	boxes: { canonical: 'count', unitClass: 'count', toBase: 1 },
 	pinch: { canonical: 'pinch', unitClass: 'weight', toBase: 0.36 },
 	dash: { canonical: 'dash', unitClass: 'volume', toBase: 0.6 },
 };
@@ -88,4 +96,17 @@ export const UNICODE_FRACTIONS: Record<string, number> = {
 	'⅞': 0.875,
 };
 
-export const OPTIONAL_PHRASES = ['to taste', 'optional', 'for garnish', 'for serving', 'as needed', 'as desired'];
+export const OPTIONAL_PHRASES = [
+	'to taste',
+	'optional',
+	'for garnish',
+	'for serving',
+	'as needed',
+	'as desired',
+	'as required',
+	'for frying',
+	'for greasing',
+	'for cooking',
+	'for drizzling',
+	'for dusting',
+];

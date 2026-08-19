@@ -16,6 +16,8 @@ const { error = null, value = '', title = '', servings } = Astro.props;
 // from sessionStorage on a fresh page load.
 const servingsValue = servings ?? 1;
 const servingsPrefilled = servings !== undefined;
+
+const EXAMPLE_PLACEHOLDER = '1 lb chicken breast\n2 cups all-purpose flour\n1 tsp salt\n1/2 cup butter, softened\n2 large eggs';
 ---
 
 <form id="paste-form" method="POST" action={actions.analyzeText} class="space-y-md">
@@ -39,20 +41,41 @@ const servingsPrefilled = servings !== undefined;
 		</div>
 	</div>
 
-	<div>
-		<label for="ingredient-textarea" class="text-body-sm-strong text-ink block mb-xxs"
-			>Paste your ingredients (one per line)</label
-		>
-		<p class="text-caption text-mute mb-xxs">
-			Format: <span class="font-mono">amount unit ingredient</span> — e.g.
-			<span class="font-mono">500g basmati rice</span>, <span class="font-mono">2 cups flour</span>.
+	<div id="paste-text-mode">
+		<div class="flex items-center gap-xs mb-xxs">
+			<label for="ingredient-textarea" class="text-body-sm-strong text-ink">Paste your ingredients (one per line)</label>
+			<button
+				type="button"
+				id="format-info-toggle"
+				aria-expanded="false"
+				aria-controls="format-info-panel"
+				aria-label="Format help"
+				class="shrink-0 h-5 w-5 rounded-full bg-black text-white hover:opacity-80 text-caption flex items-center justify-center"
+			>
+				i
+			</button>
+		</div>
+		<p class="text-caption text-warning-deep font-medium mb-xxs">
+			One ingredient per line — e.g. <span class="font-mono">2 cups basmati rice</span>.
 		</p>
+		<div
+			id="format-info-panel"
+			role="note"
+			class="hidden text-caption text-body bg-canvas-soft-2 border border-hairline rounded-sm p-sm mb-xs space-y-xxs"
+		>
+			<p><strong class="text-ink">Golden rule: one ingredient per line.</strong> Combining two ingredients on one line is the #1 cause of a wrong result.</p>
+			<p>Write each line as <span class="font-mono">quantity unit ingredient</span>, e.g. <span class="font-mono">2 cups flour</span> or <span class="font-mono">1 lb chicken breast</span>.</p>
+			<p>Name-first also works: <span class="font-mono">Chicken breast - 1 lb</span> or <span class="font-mono">Flour: 2 cups</span>.</p>
+			<p>A weight in parentheses is used exactly as given: <span class="font-mono">4 slices (4 oz) cheddar cheese</span>.</p>
+			<p>No amount? Say so instead of guessing: <span class="font-mono">salt to taste</span>.</p>
+			<p class="text-mute">You'll get a chance to review how each line was read before we calculate anything.</p>
+		</div>
 		<textarea
 			id="ingredient-textarea"
 			name="text"
 			required
 			rows="10"
-			placeholder={'2 cups all-purpose flour\n1 tsp salt\n1/2 cup butter, softened\n2 large eggs'}
+			placeholder={EXAMPLE_PLACEHOLDER}
 			class="w-full bg-canvas text-ink border border-hairline rounded-sm p-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-link"
 			>{value}</textarea
 		>
@@ -60,55 +83,203 @@ const servingsPrefilled = servings !== undefined;
 		<p id="paste-format-error" class="text-body-sm text-error-deep mt-xxs hidden"></p>
 	</div>
 
+	<div id="paste-preview-mode" class="hidden space-y-sm">
+		<div>
+			<p class="text-body-sm-strong text-ink mb-xxs">Review parsed ingredients</p>
+			<p class="text-caption text-body">Each row is one ingredient as we read it. Fix anything that looks wrong, then calculate.</p>
+			<p id="paste-preview-warning" class="text-body-sm text-warning-deep mt-xxs hidden"></p>
+		</div>
+
+		<div class="grid grid-cols-[80px_100px_1fr_36px] gap-xs text-caption text-mute px-xxs">
+			<span>Qty</span>
+			<span>Unit</span>
+			<span>Ingredient</span>
+			<span></span>
+		</div>
+		<div id="preview-rows" class="space-y-xs"></div>
+
+		<button type="button" id="preview-add-row" class="text-body-sm-strong text-link hover:underline">+ Add ingredient</button>
+	</div>
+
 	<div class="flex items-center gap-md">
-		<Button type="submit">Calculate nutrition</Button>
+		<Button type="submit" id="paste-primary-btn">Review ingredients</Button>
+		<span id="preview-edit-text-wrap" class="hidden">
+			<Button type="button" id="preview-edit-text" variant="secondary">Edit text</Button>
+		</span>
 		<Button type="button" id="paste-start-over" variant="secondary">Start over</Button>
 	</div>
 </form>
 
+<template id="preview-row-template">
+	<div class="grid grid-cols-[80px_100px_1fr_36px] gap-xs items-center" data-row>
+		<input
+			data-field="quantity"
+			placeholder="2"
+			class="w-full h-10 bg-canvas text-ink border border-hairline rounded-sm px-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-link"
+		/>
+		<input
+			data-field="unit"
+			placeholder="cups"
+			class="w-full h-10 bg-canvas text-ink border border-hairline rounded-sm px-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-link"
+		/>
+		<div>
+			<input
+				data-field="name"
+				placeholder="all-purpose flour"
+				class="w-full h-10 bg-canvas text-ink border border-hairline rounded-sm px-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-link"
+			/>
+			<p data-row-warning class="text-caption text-warning-deep mt-0.5 hidden">No amount detected — check this line.</p>
+		</div>
+		<button type="button" data-remove-row class="text-mute hover:text-error-deep text-body-sm" aria-label="Remove row">&times;</button>
+	</div>
+</template>
+
 <script>
-	import { checkIngredientTextFormat } from '../../lib/parseIngredients';
+	import { checkIngredientTextFormat, parseIngredients } from '../../lib/parseIngredients';
 	import { clearSavedInput } from '../../lib/clearSavedInputs';
 
 	const form = document.getElementById('paste-form') as HTMLFormElement | null;
+	const textMode = document.getElementById('paste-text-mode');
+	const previewMode = document.getElementById('paste-preview-mode');
 	const textarea = document.getElementById('ingredient-textarea') as HTMLTextAreaElement | null;
 	const errorEl = document.getElementById('paste-format-error');
+	const primaryBtn = document.getElementById('paste-primary-btn');
+	const editTextBtn = document.getElementById('preview-edit-text');
+	const editTextBtnWrap = document.getElementById('preview-edit-text-wrap');
+	const titleInput = document.getElementById('paste-title') as HTMLInputElement | null;
+	const servingsInput = document.getElementById('paste-servings') as HTMLInputElement | null;
+
+	const infoToggle = document.getElementById('format-info-toggle');
+	const infoPanel = document.getElementById('format-info-panel');
+
+	function openInfoPanel() {
+		infoPanel?.classList.remove('hidden');
+		infoToggle?.setAttribute('aria-expanded', 'true');
+	}
+	infoToggle?.addEventListener('click', () => {
+		const isOpen = !infoPanel?.classList.contains('hidden');
+		infoPanel?.classList.toggle('hidden', isOpen);
+		infoToggle?.setAttribute('aria-expanded', String(!isOpen));
+	});
+	// Reminded every time, not just once: the info panel opens on every focus of the textarea.
+	textarea?.addEventListener('focus', openInfoPanel);
+
+	// --- Preview step: parsed client-side (this module is already bundled for the submit-time
+	// format check below), so switching modes never needs a server round trip. -------------------
+	let inPreview = false;
+	const previewRows = document.getElementById('preview-rows')!;
+	const previewRowTemplate = document.getElementById('preview-row-template') as HTMLTemplateElement;
+	const previewWarning = document.getElementById('paste-preview-warning');
+
+	function formatQty(n: number | null): string {
+		if (n === null) return '';
+		return String(Math.round(n * 1000) / 1000);
+	}
+
+	function addPreviewRow(quantity: string, unit: string, name: string, needsAmount: boolean) {
+		const clone = previewRowTemplate.content.cloneNode(true) as DocumentFragment;
+		(clone.querySelector('[data-field="quantity"]') as HTMLInputElement).value = quantity;
+		(clone.querySelector('[data-field="unit"]') as HTMLInputElement).value = unit;
+		(clone.querySelector('[data-field="name"]') as HTMLInputElement).value = name;
+		if (needsAmount) (clone.querySelector('[data-row-warning]') as HTMLElement).classList.remove('hidden');
+		previewRows.appendChild(clone);
+	}
+
+	function enterPreview(): boolean {
+		if (!textarea) return false;
+		const check = checkIngredientTextFormat(textarea.value);
+		if (!check.ok && check.blocking) {
+			errorEl!.textContent = check.reason ?? 'That format is hard to read.';
+			errorEl!.classList.remove('hidden');
+			textarea.focus();
+			return false;
+		}
+		errorEl?.classList.add('hidden');
+
+		previewRows.innerHTML = '';
+		for (const line of parseIngredients(textarea.value)) {
+			const name = line.isOptionalOrToTaste ? `${line.ingredientName} to taste` : line.ingredientName;
+			const needsAmount = line.quantity === null && !line.isOptionalOrToTaste;
+			addPreviewRow(formatQty(line.quantity), line.unit === 'count' ? '' : (line.unit ?? ''), name, needsAmount);
+		}
+
+		if (previewWarning) {
+			if (!check.ok) {
+				previewWarning.textContent = `Heads up: ${check.reason} Incorrect formatting may lead to incorrect results — fix any flagged rows below.`;
+				previewWarning.classList.remove('hidden');
+			} else {
+				previewWarning.classList.add('hidden');
+			}
+		}
+		return true;
+	}
+
+	function showPreview() {
+		if (!enterPreview()) return;
+		inPreview = true;
+		textMode?.classList.add('hidden');
+		previewMode?.classList.remove('hidden');
+		editTextBtnWrap?.classList.remove('hidden');
+		if (primaryBtn) primaryBtn.textContent = 'Calculate nutrition';
+	}
+
+	function showTextMode() {
+		inPreview = false;
+		previewMode?.classList.add('hidden');
+		textMode?.classList.remove('hidden');
+		editTextBtnWrap?.classList.add('hidden');
+		if (primaryBtn) primaryBtn.textContent = 'Review ingredients';
+	}
+
+	editTextBtn?.addEventListener('click', showTextMode);
 
 	document.getElementById('paste-start-over')?.addEventListener('click', () => {
 		if (textarea) textarea.value = '';
+		if (titleInput) titleInput.value = '';
+		if (servingsInput) servingsInput.value = '1';
 		clearSavedInput('recipeCalc:pasteText');
+		clearSavedInput('recipeCalc:pasteTitle');
+		clearSavedInput('recipeCalc:pasteServings');
 		errorEl?.classList.add('hidden');
+		previewRows.innerHTML = '';
+		showTextMode();
 		textarea?.focus();
 	});
 
+	document.getElementById('preview-add-row')?.addEventListener('click', () => addPreviewRow('', '', '', false));
+	previewRows.addEventListener('click', (e) => {
+		const target = e.target as HTMLElement;
+		if (target.matches('[data-remove-row]')) {
+			target.closest('[data-row]')?.remove();
+		}
+	});
+
+	/** Rebuilds the textarea's text from the (possibly hand-edited) preview rows, one row per line,
+	 * exactly the "quantity unit ingredient" format the parser expects — so the real submission goes
+	 * through the same server-side parse+match pipeline as if the user had typed this directly. */
+	function rebuildTextFromRows(): string {
+		return Array.from(previewRows.querySelectorAll('[data-row]'))
+			.map((row) => {
+				const quantity = (row.querySelector('[data-field="quantity"]') as HTMLInputElement)?.value.trim() ?? '';
+				const unit = (row.querySelector('[data-field="unit"]') as HTMLInputElement)?.value.trim() ?? '';
+				const name = (row.querySelector('[data-field="name"]') as HTMLInputElement)?.value.trim() ?? '';
+				return [quantity, unit, name].filter(Boolean).join(' ');
+			})
+			.filter((line) => line.length > 0)
+			.join('\n');
+	}
+
 	form?.addEventListener('submit', (e) => {
-		if (!textarea || !errorEl) return;
-		const check = checkIngredientTextFormat(textarea.value);
-		if (check.ok) {
-			errorEl.classList.add('hidden');
+		if (inPreview) {
+			// Confirming from the review step — write the (possibly edited) rows back into the
+			// textarea and let this submit proceed normally to the same analyzeText action.
+			if (textarea) textarea.value = rebuildTextFromRows();
 			return;
 		}
-
-		let message = check.reason ?? 'That format is hard to read.';
-		if (check.unparsedExamples?.length) {
-			message += ` We couldn't read: "${check.unparsedExamples.join('", "')}".`;
-		}
-
-		if (check.blocking) {
-			e.preventDefault();
-			errorEl.textContent = message;
-			errorEl.classList.remove('hidden');
-			errorEl.classList.remove('text-warning-deep');
-			errorEl.classList.add('text-error-deep');
-			textarea.focus();
-			return;
-		}
-
-		// Not blocking — let the calculation proceed, just warn that results may be off.
-		errorEl.textContent = `Heads up: ${message} Results may be less accurate.`;
-		errorEl.classList.remove('hidden');
-		errorEl.classList.remove('text-error-deep');
-		errorEl.classList.add('text-warning-deep');
+		// Progressive enhancement: without JS this is a real submit button, so the form still POSTs
+		// directly to analyzeText as before. With JS, its first job is to open the review step.
+		e.preventDefault();
+		showPreview();
 	});
 </script>
 

@@ -35,10 +35,13 @@ const { error = null, value = '' } = Astro.props;
 	import { clearSavedInput } from '../../lib/clearSavedInputs';
 
 	const urlInput = document.getElementById('recipe-url') as HTMLInputElement | null;
+	const servingsInput = document.getElementById('url-servings') as HTMLInputElement | null;
 
 	document.getElementById('url-start-over')?.addEventListener('click', () => {
 		if (urlInput) urlInput.value = '';
+		if (servingsInput) servingsInput.value = '';
 		clearSavedInput('recipeCalc:url');
+		clearSavedInput('recipeCalc:urlServings');
 		urlInput?.focus();
 	});
 

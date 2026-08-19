@@ -19,7 +19,10 @@ import Button from '../ui/Button.astro';
 		</p>
 	</div>
 	<p id="photo-error" class="text-body-sm text-error-deep hidden"></p>
-	<Button type="button" id="photo-submit">Transcribe photo</Button>
+	<div class="flex items-center gap-md">
+		<Button type="button" id="photo-submit">Transcribe photo</Button>
+		<Button type="button" id="photo-start-over" variant="secondary">Start over</Button>
+	</div>
 </form>
 
 <script>
@@ -68,5 +71,10 @@ import Button from '../ui/Button.astro';
 			}
 			window.activateInputTab?.('paste');
 		}
+	});
+
+	document.getElementById('photo-start-over')?.addEventListener('click', () => {
+		fileInput.value = '';
+		errorEl.classList.add('hidden');
 	});
 </script>

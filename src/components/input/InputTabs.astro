@@ -16,7 +16,7 @@ interface Props {
 }
 
 const {
-	activeTab = 'paste',
+	activeTab = 'manual',
 	textError = null,
 	urlError = null,
 	manualError = null,
@@ -27,9 +27,9 @@ const {
 } = Astro.props;
 
 const tabs = [
+	{ id: 'manual', label: 'Manual entry' },
 	{ id: 'paste', label: 'Paste text' },
 	{ id: 'url', label: 'From a URL' },
-	{ id: 'manual', label: 'Manual entry' },
 	{ id: 'photo', label: 'Photo' },
 ] as const;
 ---
