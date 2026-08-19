@@ -80,64 +80,6 @@ const features = [
 	},
 ];
 
-const faqs = [
-	{
-		q: 'Is this recipe nutrition calculator really free?',
-		a: 'Yes — pasting ingredients, importing a URL, uploading a photo, and the full macro and micronutrient breakdown are all free, with no account and no paywalled results.',
-	},
-	{
-		q: 'How accurate is this recipe calorie calculator?',
-		a: 'Exact ingredient matches are as accurate as the underlying USDA-derived data. When a match or unit conversion has to fall back to a generic estimate, that line is clearly flagged rather than shown as precise. See how it works for the full methodology.',
-	},
-	{
-		q: 'Can I use it as an online recipe nutrition calculator for any recipe?',
-		a: 'Yes — paste ingredient text, drop in a link to a recipe page with structured recipe data, or upload a photo of a printed or handwritten list. It works for homemade recipes and ones copied from anywhere on the web.',
-	},
-	{
-		q: 'Do I need to install an app?',
-		a: 'No — it runs in your browser at recipenutritioncalc.com. Add it to your home screen for one-tap access if you want an app-like feel, without an app-store install.',
-	},
-	{
-		q: 'How is this different from a calculator that only shows calories?',
-		a: 'Most free recipe calorie calculators stop at calories, protein, carbs, and fat. This one adds 20+ micronutrients and a health score, so you get a complete picture, not just a calorie count.',
-	},
-	{
-		q: 'How is nutrition from a recipe calculated?',
-		a: 'Each ingredient line is parsed for quantity, unit, and name, converted to grams, then matched against a USDA-derived nutrition database. Matched values are summed and divided across your servings. See how it works for the full breakdown of parsing, unit conversion, and matching.',
-	},
-	{
-		q: 'Can I take a picture of a recipe and get its nutrition?',
-		a: 'Yes — upload a photo of a printed or handwritten recipe and it\'s transcribed and parsed the same way as pasted text, then run through the same database matching and calculation.',
-	},
-	{
-		q: 'Is this completely AI calculated?',
-		a: 'No. Nutrition values are matched against a USDA-derived database first. AI is only used as a fallback when an ingredient isn\'t in that database, and those lines are clearly flagged as AI-estimated rather than blended in silently.',
-	},
-	{
-		q: 'How will this help me?',
-		a: 'It gives you an accurate per-serving nutrition breakdown in seconds instead of manually looking up and summing each ingredient — useful for portioning meal prep, tracking sodium or sugar, or adding nutrition facts to a recipe post.',
-	},
-];
-
-const faqStructuredData = {
-	'@context': 'https://schema.org',
-	'@type': 'FAQPage',
-	mainEntity: faqs.map((f) => ({
-		'@type': 'Question',
-		name: f.q,
-		acceptedAnswer: { '@type': 'Answer', text: f.a },
-	})),
-};
-
-function slugify(text: string) {
-	return text
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, '-')
-		.replace(/(^-|-$)/g, '');
-}
-
-const faqsWithSlug = faqs.map((f) => ({ ...f, slug: slugify(f.q) }));
-
 const appStructuredData = {
 	'@context': 'https://schema.org',
 	'@type': 'WebApplication',
@@ -154,32 +96,31 @@ const appStructuredData = {
 <Layout
 	title="Recipe Nutrition Calculator — Free Calorie & Macro Calculator"
 	description="Free recipe nutrition calculator: paste ingredients, a URL, or a photo for an instant recipe calorie calculator breakdown — calories, macros, and 20+ micronutrients per serving. No login, no paywall."
-	structuredData={[appStructuredData, faqStructuredData]}
+	structuredData={[appStructuredData]}
 >
 	<section class="relative">
-		<div class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[380px] overflow-hidden" aria-hidden="true">
+		<div class="pointer-events-none absolute inset-x-0 top-0 z-0 h-[420px] overflow-hidden" aria-hidden="true">
 			<div
-				class="absolute inset-x-0 top-[-220px] h-[520px] opacity-[0.14] blur-[110px] dark:opacity-[0.2]"
+				class="absolute inset-x-0 top-0 h-full opacity-40 blur-[90px] dark:opacity-50"
 				style="
 					background:
-						radial-gradient(38% 55% at 32% 45%, var(--color-accent) 0%, transparent 100%),
-						radial-gradient(36% 52% at 68% 40%, var(--color-warning) 0%, transparent 100%);
-					-webkit-mask-image:
-						linear-gradient(to bottom, #000 35%, transparent 100%),
-						linear-gradient(to right, transparent 0%, #000 18%, #000 82%, transparent 100%);
-					mask-image:
-						linear-gradient(to bottom, #000 35%, transparent 100%),
-						linear-gradient(to right, transparent 0%, #000 18%, #000 82%, transparent 100%);
-					-webkit-mask-composite: source-in;
-					mask-composite: intersect;
+						radial-gradient(45% 65% at 28% 0%, var(--color-accent) 0%, transparent 75%),
+						radial-gradient(42% 60% at 72% 0%, var(--color-link) 0%, transparent 75%);
 				"
 			>
 			</div>
 		</div>
-		<div class="max-w-[1400px] mx-auto px-md sm:px-lg pt-3xl pb-2xl">
+		<div class="relative z-10 max-w-[1400px] mx-auto px-md sm:px-lg pt-3xl pb-2xl">
 			<div class="max-w-[720px]">
-				<span class="text-caption-mono text-mute uppercase tracking-wide">Free · No login required</span>
-				<h1 class="text-display-xl text-ink mt-xs">The free Recipe Nutrition Calculator for any recipe.</h1>
+				<span
+					class="inline-flex items-center gap-xxs rounded-full bg-gradient-ship-start/10 px-sm py-xxs text-caption-mono text-[var(--color-gradient-ship-start)] uppercase tracking-wide"
+				>
+					<span class="h-1.5 w-1.5 rounded-full bg-gradient-to-r from-gradient-ship-start to-gradient-ship-end"></span>
+					Free · No login required
+				</span>
+				<h1 class="text-display-xl text-ink mt-xs">
+					The free <span class="bg-gradient-to-r from-accent to-link bg-clip-text text-transparent">Recipe Nutrition Calculator</span> for any recipe.
+				</h1>
 				<p class="text-body-lg text-body mt-sm">
 					Paste a recipe, drop in a link, or snap a photo. This online recipe nutrition calculator gets you
 					calories, full macros, and 20+ micronutrients per serving in seconds — free, with no login.
@@ -299,55 +240,16 @@ const appStructuredData = {
 		</div>
 	</section>
 
-	<section class="max-w-[760px] mx-auto px-md sm:px-lg py-5xl">
-		<h2 class="text-display-lg text-ink mb-lg">Frequently asked questions</h2>
-		<nav aria-label="FAQ navigation" class="flex flex-wrap gap-xs mb-lg">
-			{
-				faqsWithSlug.map((f) => (
-					<a
-						href={`#${f.slug}`}
-						class="rounded-full border border-hairline px-sm py-xs text-body-sm text-body hover:text-ink hover:bg-canvas-soft"
-					>
-						{f.q}
-					</a>
-				))
-			}
-		</nav>
-		<div class="border-t border-hairline">
-			{
-				faqsWithSlug.map((f) => (
-					<details class="group border-b border-hairline py-md [&::details-content]:transition-all">
-						<summary
-							id={f.slug}
-							class="scroll-mt-24 flex items-center justify-between gap-md cursor-pointer list-none text-body-md-strong text-ink marker:content-none [&::-webkit-details-marker]:hidden"
-						>
-							{f.q}
-							<span class="shrink-0 text-mute text-body-lg leading-none transition-transform duration-150 group-open:rotate-45">
-								+
-							</span>
-						</summary>
-						<p class="text-body-md text-body mt-sm">{f.a}</p>
-					</details>
-				))
-			}
-		</div>
+	<section class="max-w-[760px] mx-auto px-md sm:px-lg py-5xl text-center">
+		<h2 class="text-display-lg text-ink mb-sm">Frequently asked questions</h2>
+		<p class="text-body-md text-body mb-lg">
+			Accuracy, pricing, photo uploads, and how the numbers are calculated.
+		</p>
+		<a
+			href="/faq"
+			class="text-button-lg bg-primary text-on-primary rounded-pill px-md h-12 inline-flex items-center hover:opacity-90"
+		>
+			Read the FAQ
+		</a>
 	</section>
-
-	<script>
-		function openFaqFromHash() {
-			const id = window.location.hash.slice(1);
-			if (!id) return;
-			document.getElementById(id)?.closest('details')?.setAttribute('open', '');
-		}
-
-		document.querySelectorAll<HTMLAnchorElement>('nav[aria-label="FAQ navigation"] a').forEach((link) => {
-			link.addEventListener('click', () => {
-				const id = link.getAttribute('href')?.slice(1);
-				if (id) document.getElementById(id)?.closest('details')?.setAttribute('open', '');
-			});
-		});
-
-		openFaqFromHash();
-		window.addEventListener('hashchange', openFaqFromHash);
-	</script>
 </Layout>

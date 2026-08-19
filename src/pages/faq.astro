@@ -1,0 +1,101 @@
+---
+export const prerender = true;
+import Layout from '../layouts/Layout.astro';
+
+const faqs = [
+	{
+		q: 'Is this recipe nutrition calculator really free?',
+		a: 'Yes — pasting ingredients, importing a URL, uploading a photo, and the full macro and micronutrient breakdown are all free, with no account and no paywalled results.',
+	},
+	{
+		q: 'How accurate is this recipe calorie calculator?',
+		a: 'Exact ingredient matches are as accurate as the underlying USDA-derived data. When a match or unit conversion has to fall back to a generic estimate, that line is clearly flagged rather than shown as precise. See how it works for the full methodology.',
+	},
+	{
+		q: 'Can I use it as an online recipe nutrition calculator for any recipe?',
+		a: 'Yes — paste ingredient text, drop in a link to a recipe page with structured recipe data, or upload a photo of a printed or handwritten list. It works for homemade recipes and ones copied from anywhere on the web.',
+	},
+	{
+		q: 'Do I need to install an app?',
+		a: 'No — it runs in your browser at recipenutritioncalc.com. Add it to your home screen for one-tap access if you want an app-like feel, without an app-store install.',
+	},
+	{
+		q: 'How is this different from a calculator that only shows calories?',
+		a: 'Most free recipe calorie calculators stop at calories, protein, carbs, and fat. This one adds 20+ micronutrients and a health score, so you get a complete picture, not just a calorie count.',
+	},
+	{
+		q: 'How is nutrition from a recipe calculated?',
+		a: 'Each ingredient line is parsed for quantity, unit, and name, converted to grams, then matched against a USDA-derived nutrition database. Matched values are summed and divided across your servings. See how it works for the full breakdown of parsing, unit conversion, and matching.',
+	},
+	{
+		q: 'Can I take a picture of a recipe and get its nutrition?',
+		a: 'Yes — upload a photo of a printed or handwritten recipe and it\'s transcribed and parsed the same way as pasted text, then run through the same database matching and calculation.',
+	},
+	{
+		q: 'Is this completely AI calculated?',
+		a: 'No. Nutrition values are matched against a USDA-derived database first. AI is only used as a fallback when an ingredient isn\'t in that database, and those lines are clearly flagged as AI-estimated rather than blended in silently.',
+	},
+	{
+		q: 'How will this help me?',
+		a: 'It gives you an accurate per-serving nutrition breakdown in seconds instead of manually looking up and summing each ingredient — useful for portioning meal prep, tracking sodium or sugar, or adding nutrition facts to a recipe post.',
+	},
+];
+
+const faqStructuredData = {
+	'@context': 'https://schema.org',
+	'@type': 'FAQPage',
+	mainEntity: faqs.map((f) => ({
+		'@type': 'Question',
+		name: f.q,
+		acceptedAnswer: { '@type': 'Answer', text: f.a },
+	})),
+};
+
+function slugify(text: string) {
+	return text
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/(^-|-$)/g, '');
+}
+
+const faqsWithSlug = faqs.map((f) => ({ ...f, slug: slugify(f.q) }));
+---
+
+<Layout
+	title="FAQ — Recipe Nutrition Calculator"
+	description="Answers to common questions about the free recipe nutrition calculator: accuracy, pricing, photo uploads, and how nutrition is calculated."
+	structuredData={[faqStructuredData]}
+>
+	<section class="max-w-[760px] mx-auto px-md sm:px-lg py-3xl">
+		<h1 class="text-display-lg text-ink mb-lg">Frequently asked questions</h1>
+		<div class="border-t border-hairline">
+			{
+				faqsWithSlug.map((f) => (
+					<details class="group border-b border-hairline py-md [&::details-content]:transition-all">
+						<summary
+							id={f.slug}
+							class="scroll-mt-24 flex items-center justify-between gap-md cursor-pointer list-none text-body-md-strong text-ink marker:content-none [&::-webkit-details-marker]:hidden"
+						>
+							{f.q}
+							<span class="shrink-0 text-mute text-body-lg leading-none transition-transform duration-150 group-open:rotate-45">
+								+
+							</span>
+						</summary>
+						<p class="text-body-md text-body mt-sm">{f.a}</p>
+					</details>
+				))
+			}
+		</div>
+	</section>
+
+	<script>
+		function openFaqFromHash() {
+			const id = window.location.hash.slice(1);
+			if (!id) return;
+			document.getElementById(id)?.closest('details')?.setAttribute('open', '');
+		}
+
+		openFaqFromHash();
+		window.addEventListener('hashchange', openFaqFromHash);
+	</script>
+</Layout>
