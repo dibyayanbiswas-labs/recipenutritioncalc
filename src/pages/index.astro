@@ -8,17 +8,19 @@ import { loadResult } from '../lib/kv';
 import { env } from 'cloudflare:workers';
 
 interface FormFlash {
-	tab: 'paste' | 'url';
+	tab: 'paste' | 'url' | 'manual';
 	error?: string;
 	resultId?: string;
 }
 
 const textResult = Astro.getActionResult(actions.analyzeText);
 const urlResult = Astro.getActionResult(actions.analyzeUrl);
+const manualResult = Astro.getActionResult(actions.analyzeManual);
 
 // Post/Redirect/Get: stash the outcome in the session and redirect back to a clean "/" — so a
 // browser refresh just re-loads a blank page instead of resubmitting the form and repeating the
-// same result or error.
+// same result or error. Only one flash is ever stored, so whichever tab was just calculated is
+// the only result shown — it replaces anything calculated from another tab before it.
 if (textResult) {
 	Astro.session?.set<FormFlash>('formFlash', { tab: 'paste', error: textResult.error?.message, resultId: textResult.data?.id });
 	return Astro.redirect('/');
@@ -27,13 +29,18 @@ if (urlResult) {
 	Astro.session?.set<FormFlash>('formFlash', { tab: 'url', error: urlResult.error?.message, resultId: urlResult.data?.id });
 	return Astro.redirect('/');
 }
+if (manualResult) {
+	Astro.session?.set<FormFlash>('formFlash', { tab: 'manual', error: manualResult.error?.message, resultId: manualResult.data?.id });
+	return Astro.redirect('/');
+}
 
 const flash = await Astro.session?.get<FormFlash>('formFlash');
 if (flash) Astro.session?.delete('formFlash');
 
-const activeTab: 'paste' | 'url' = flash?.tab ?? 'paste';
+const activeTab: 'paste' | 'url' | 'manual' = flash?.tab ?? 'paste';
 const textError = flash?.tab === 'paste' ? (flash.error ?? null) : null;
 const urlError = flash?.tab === 'url' ? (flash.error ?? null) : null;
+const manualError = flash?.tab === 'manual' ? (flash.error ?? null) : null;
 const nutritionResult = flash?.resultId ? await loadResult(env.RESULTS_KV, flash.resultId) : null;
 
 const features = [
@@ -66,7 +73,7 @@ const features = [
 
 	<section class="max-w-[1400px] mx-auto px-md sm:px-lg pb-4xl">
 		<Card variant="marketing-large">
-			<InputTabs activeTab={activeTab} textError={textError} urlError={urlError} />
+			<InputTabs activeTab={activeTab} textError={textError} urlError={urlError} manualError={manualError} />
 		</Card>
 
 		{

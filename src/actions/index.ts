@@ -69,25 +69,24 @@ export const server = {
 	}),
 
 	analyzeManual: defineAction({
-		accept: 'json',
+		accept: 'form',
 		input: z.object({
 			title: z.string().optional(),
 			servings: z.coerce.number().min(1).max(100).default(1),
-			rows: z
-				.array(
-					z.object({
-						quantity: z.string(),
-						unit: z.string(),
-						name: z.string(),
-					}),
-				)
-				.min(1, 'Add at least one ingredient.'),
+			quantity: z.array(z.string()),
+			unit: z.array(z.string()),
+			name: z.array(z.string()),
 		}),
-		handler: async ({ title, servings, rows }) => {
+		handler: async ({ title, servings, quantity, unit, name }) => {
 			const id = generateResultId();
-			const lines = rows
+			const lines = name
+				.map((n, i) => ({ quantity: quantity[i] ?? '', unit: unit[i] ?? '', name: n }))
 				.filter((r) => r.name.trim().length > 0)
 				.map((r) => parseIngredientLine([r.quantity, r.unit, r.name].filter(Boolean).join(' ').trim()));
+
+			if (lines.length === 0) {
+				throw new ActionError({ code: 'BAD_REQUEST', message: 'Add at least one ingredient.' });
+			}
 
 			const ingredients = await analyzeIngredientLines(lines, env.AI);
 			const result = buildNutritionResult({

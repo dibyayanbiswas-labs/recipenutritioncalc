@@ -1,9 +1,16 @@
 ---
+import { actions } from 'astro:actions';
 import Input from '../ui/Input.astro';
 import Button from '../ui/Button.astro';
+
+interface Props {
+	error?: string | null;
+}
+
+const { error = null } = Astro.props;
 ---
 
-<form id="manual-form" class="space-y-md">
+<form id="manual-form" method="POST" action={actions.analyzeManual} class="space-y-md">
 	<div class="grid sm:grid-cols-[1fr_140px] gap-sm">
 		<div>
 			<label for="manual-title" class="text-body-sm-strong text-ink block mb-xxs">Recipe name (optional)</label>
@@ -28,10 +35,10 @@ import Button from '../ui/Button.astro';
 
 	<button type="button" id="add-row" class="text-body-sm-strong text-link hover:underline">+ Add ingredient</button>
 
-	<p id="manual-error" class="text-body-sm text-error-deep hidden"></p>
+	{error && <p class="text-body-sm text-error-deep" id="manual-error">{error}</p>}
 
 	<div class="flex items-center gap-md">
-		<Button type="button" id="manual-submit">Calculate nutrition</Button>
+		<Button type="submit" id="manual-submit">Calculate nutrition</Button>
 		<Button type="button" id="manual-start-over" variant="secondary">Start over</Button>
 	</div>
 </form>
@@ -60,29 +67,74 @@ import Button from '../ui/Button.astro';
 </template>
 
 <script>
-	import { actions } from 'astro:actions';
+	import { clearSavedInput } from '../../lib/clearSavedInputs';
 
 	const rowsContainer = document.getElementById('manual-rows')!;
 	const template = document.getElementById('row-template') as HTMLTemplateElement;
 	const addRowBtn = document.getElementById('add-row')!;
-	const submitBtn = document.getElementById('manual-submit')!;
-	const errorEl = document.getElementById('manual-error')!;
-	const form = document.getElementById('manual-form') as HTMLFormElement;
+	const titleInput = document.getElementById('manual-title') as HTMLInputElement | null;
+	const servingsInput = document.getElementById('manual-servings') as HTMLInputElement | null;
+
+	const ROWS_KEY = 'recipeCalc:manualRows';
+	const TITLE_KEY = 'recipeCalc:manualTitle';
+	const SERVINGS_KEY = 'recipeCalc:manualServings';
+
+	type SavedRow = { quantity: string; unit: string; name: string };
+
+	function currentRows(): SavedRow[] {
+		return Array.from(rowsContainer.querySelectorAll('[data-row]')).map((row) => ({
+			quantity: (row.querySelector('[name="quantity"]') as HTMLInputElement)?.value ?? '',
+			unit: (row.querySelector('[name="unit"]') as HTMLInputElement)?.value ?? '',
+			name: (row.querySelector('[name="name"]') as HTMLInputElement)?.value ?? '',
+		}));
+	}
+
+	function persistRows() {
+		sessionStorage.setItem(ROWS_KEY, JSON.stringify(currentRows()));
+	}
+
+	function appendRow(values?: SavedRow) {
+		const clone = template.content.cloneNode(true) as DocumentFragment;
+		if (values) {
+			(clone.querySelector('[name="quantity"]') as HTMLInputElement).value = values.quantity;
+			(clone.querySelector('[name="unit"]') as HTMLInputElement).value = values.unit;
+			(clone.querySelector('[name="name"]') as HTMLInputElement).value = values.name;
+		}
+		rowsContainer.appendChild(clone);
+	}
+
+	// A fresh page load always renders a single empty row from the server — restore whatever the
+	// user last typed instead of leaving it blank, the same way the paste/URL tabs restore theirs.
+	const savedRowsRaw = sessionStorage.getItem(ROWS_KEY);
+	if (savedRowsRaw) {
+		try {
+			const savedRows = JSON.parse(savedRowsRaw) as SavedRow[];
+			if (Array.isArray(savedRows) && savedRows.length > 0) {
+				rowsContainer.innerHTML = '';
+				savedRows.forEach((r) => appendRow(r));
+			}
+		} catch {
+			// Corrupt/old sessionStorage value — ignore and keep the default empty row.
+		}
+	}
+	if (titleInput && !titleInput.value) {
+		const saved = sessionStorage.getItem(TITLE_KEY);
+		if (saved) titleInput.value = saved;
+	}
 
 	document.getElementById('manual-start-over')?.addEventListener('click', () => {
-		rowsContainer.querySelectorAll('[data-row]').forEach((row, i) => {
-			if (i === 0) {
-				row.querySelectorAll('input').forEach((input) => ((input as HTMLInputElement).value = ''));
-			} else {
-				row.remove();
-			}
-		});
-		errorEl.classList.add('hidden');
+		rowsContainer.innerHTML = '';
+		appendRow();
+		if (titleInput) titleInput.value = '';
+		if (servingsInput) servingsInput.value = '1';
+		clearSavedInput(ROWS_KEY);
+		clearSavedInput(TITLE_KEY);
+		clearSavedInput(SERVINGS_KEY);
 	});
 
 	addRowBtn.addEventListener('click', () => {
-		const clone = template.content.cloneNode(true) as DocumentFragment;
-		rowsContainer.appendChild(clone);
+		appendRow();
+		persistRows();
 	});
 
 	rowsContainer.addEventListener('click', (e) => {
@@ -91,34 +143,12 @@ import Button from '../ui/Button.astro';
 			const row = target.closest('[data-row]');
 			if (rowsContainer.querySelectorAll('[data-row]').length > 1) {
 				row?.remove();
+				persistRows();
 			}
 		}
 	});
 
-	submitBtn.addEventListener('click', async () => {
-		errorEl.classList.add('hidden');
-		const formData = new FormData(form);
-		const rows = Array.from(rowsContainer.querySelectorAll('[data-row]')).map((row) => ({
-			quantity: (row.querySelector('[name="quantity"]') as HTMLInputElement)?.value ?? '',
-			unit: (row.querySelector('[name="unit"]') as HTMLInputElement)?.value ?? '',
-			name: (row.querySelector('[name="name"]') as HTMLInputElement)?.value ?? '',
-		}));
-
-		submitBtn.setAttribute('disabled', 'true');
-		const { data, error } = await actions.analyzeManual({
-			title: formData.get('title')?.toString(),
-			servings: Number(formData.get('servings')) || 1,
-			rows,
-		});
-		submitBtn.removeAttribute('disabled');
-
-		if (error) {
-			errorEl.textContent = error.message;
-			errorEl.classList.remove('hidden');
-			return;
-		}
-		if (data) {
-			window.location.href = `/r/${data.id}`;
-		}
-	});
+	rowsContainer.addEventListener('input', persistRows);
+	titleInput?.addEventListener('input', () => sessionStorage.setItem(TITLE_KEY, titleInput.value));
+	servingsInput?.addEventListener('input', () => sessionStorage.setItem(SERVINGS_KEY, servingsInput.value));
 </script>
