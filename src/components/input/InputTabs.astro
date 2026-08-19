@@ -9,6 +9,9 @@ interface Props {
 	textError?: string | null;
 	urlError?: string | null;
 	manualError?: string | null;
+	pasteServingsError?: string | null;
+	urlServingsError?: string | null;
+	manualServingsError?: string | null;
 	pasteValue?: string;
 	pasteTitle?: string;
 	pasteServings?: number;
@@ -20,6 +23,9 @@ const {
 	textError = null,
 	urlError = null,
 	manualError = null,
+	pasteServingsError = null,
+	urlServingsError = null,
+	manualServingsError = null,
 	pasteValue = '',
 	pasteTitle = '',
 	pasteServings,
@@ -57,13 +63,19 @@ const tabs = [
 	</div>
 
 	<div data-tab-panel="paste" hidden={activeTab !== 'paste'}>
-		<PasteTextForm error={textError} value={pasteValue} title={pasteTitle} servings={pasteServings} />
+		<PasteTextForm
+			error={textError}
+			servingsError={pasteServingsError}
+			value={pasteValue}
+			title={pasteTitle}
+			servings={pasteServings}
+		/>
 	</div>
 	<div data-tab-panel="url" hidden={activeTab !== 'url'}>
-		<UrlForm error={urlError} value={urlValue} />
+		<UrlForm error={urlError} servingsError={urlServingsError} value={urlValue} />
 	</div>
 	<div data-tab-panel="manual" hidden={activeTab !== 'manual'}>
-		<ManualEntryForm error={manualError} />
+		<ManualEntryForm error={manualError} servingsError={manualServingsError} />
 	</div>
 	<div data-tab-panel="photo" hidden={activeTab !== 'photo'}>
 		<PhotoUploadForm />

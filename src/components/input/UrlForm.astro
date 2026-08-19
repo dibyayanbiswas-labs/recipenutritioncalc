@@ -5,10 +5,11 @@ import Button from '../ui/Button.astro';
 
 interface Props {
 	error?: string | null;
+	servingsError?: string | null;
 	value?: string;
 }
 
-const { error = null, value = '' } = Astro.props;
+const { error = null, servingsError = null, value = '' } = Astro.props;
 ---
 
 <form method="POST" action={actions.analyzeUrl} class="space-y-md">
@@ -24,6 +25,7 @@ const { error = null, value = '' } = Astro.props;
 	<div class="max-w-[200px]">
 		<label for="url-servings" class="text-body-sm-strong text-ink block mb-xxs">Servings override (optional)</label>
 		<Input id="url-servings" name="servingsOverride" type="number" placeholder="Auto-detected" />
+		{servingsError && <p class="text-body-sm text-error-deep mt-xxs">{servingsError}</p>}
 	</div>
 	<div class="flex items-center gap-md">
 		<Button type="submit">Fetch &amp; calculate</Button>

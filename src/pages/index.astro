@@ -11,19 +11,31 @@ import { env } from 'cloudflare:workers';
 interface FormFlash {
 	tab: 'paste' | 'url' | 'manual';
 	error?: string;
+	servingsError?: string;
 	resultId?: string;
 }
 
 /** `ActionInputError.message` is a raw JSON dump of every Zod issue, meant for developers, not end
- * users — the friendly per-field message we actually want lives in `.fields` instead. A plain
- * ActionError (e.g. the handler's own "add at least one ingredient" check) has no `.fields`, so
- * `.message` is already the right thing to show as-is. */
-function actionErrorMessage(error: ActionError | undefined, primaryField: string): string | undefined {
+ * users — the friendly per-field message we actually want lives in `.fields` instead, so an
+ * ActionInputError must never fall back to `.message`: if no per-field message applies to the
+ * primary slot, there's simply nothing to show there (the error may be entirely a servings-field
+ * one, handled separately below). A plain ActionError (e.g. the handler's own "add at least one
+ * ingredient" check) has no `.fields`, so `.message` is already the right thing to show as-is.
+ * Servings errors are pulled out separately (see `servingsField`) so they render next to the
+ * Servings input instead of falling into the primary field's slot, which would misattribute a
+ * servings problem to e.g. the ingredients textarea. */
+function actionErrorMessage(error: ActionError | undefined, primaryField: string, servingsField: string): string | undefined {
 	if (!error) return undefined;
 	if (isInputError(error)) {
-		return (error.fields[primaryField]?.[0] ?? Object.values(error.fields)[0]?.[0]) ?? error.message;
+		const servingsError = error.fields[servingsField]?.[0];
+		return error.fields[primaryField]?.[0] ?? (servingsError ? undefined : Object.values(error.fields)[0]?.[0]);
 	}
 	return error.message;
+}
+
+function actionServingsError(error: ActionError | undefined, servingsField: string): string | undefined {
+	if (!error || !isInputError(error)) return undefined;
+	return error.fields[servingsField]?.[0];
 }
 
 const textResult = Astro.getActionResult(actions.analyzeText);
@@ -37,7 +49,8 @@ const manualResult = Astro.getActionResult(actions.analyzeManual);
 if (textResult) {
 	Astro.session?.set<FormFlash>('formFlash', {
 		tab: 'paste',
-		error: actionErrorMessage(textResult.error, 'text'),
+		error: actionErrorMessage(textResult.error, 'text', 'servings'),
+		servingsError: actionServingsError(textResult.error, 'servings'),
 		resultId: textResult.data?.id,
 	});
 	return Astro.redirect('/');
@@ -45,7 +58,8 @@ if (textResult) {
 if (urlResult) {
 	Astro.session?.set<FormFlash>('formFlash', {
 		tab: 'url',
-		error: actionErrorMessage(urlResult.error, 'url'),
+		error: actionErrorMessage(urlResult.error, 'url', 'servingsOverride'),
+		servingsError: actionServingsError(urlResult.error, 'servingsOverride'),
 		resultId: urlResult.data?.id,
 	});
 	return Astro.redirect('/');
@@ -53,7 +67,8 @@ if (urlResult) {
 if (manualResult) {
 	Astro.session?.set<FormFlash>('formFlash', {
 		tab: 'manual',
-		error: actionErrorMessage(manualResult.error, 'name'),
+		error: actionErrorMessage(manualResult.error, 'name', 'servings'),
+		servingsError: actionServingsError(manualResult.error, 'servings'),
 		resultId: manualResult.data?.id,
 	});
 	return Astro.redirect('/');
@@ -66,6 +81,9 @@ const activeTab: 'paste' | 'url' | 'manual' = flash?.tab ?? 'manual';
 const textError = flash?.tab === 'paste' ? (flash.error ?? null) : null;
 const urlError = flash?.tab === 'url' ? (flash.error ?? null) : null;
 const manualError = flash?.tab === 'manual' ? (flash.error ?? null) : null;
+const pasteServingsError = flash?.tab === 'paste' ? (flash.servingsError ?? null) : null;
+const urlServingsError = flash?.tab === 'url' ? (flash.servingsError ?? null) : null;
+const manualServingsError = flash?.tab === 'manual' ? (flash.servingsError ?? null) : null;
 const nutritionResult = flash?.resultId ? await loadResult(env.RESULTS_KV, flash.resultId) : null;
 
 const steps = [
@@ -156,7 +174,15 @@ const appStructuredData = {
 
 	<section class="max-w-[1400px] mx-auto px-md sm:px-lg pb-4xl">
 		<Card variant="marketing-large">
-			<InputTabs activeTab={activeTab} textError={textError} urlError={urlError} manualError={manualError} />
+			<InputTabs
+				activeTab={activeTab}
+				textError={textError}
+				urlError={urlError}
+				manualError={manualError}
+				pasteServingsError={pasteServingsError}
+				urlServingsError={urlServingsError}
+				manualServingsError={manualServingsError}
+			/>
 		</Card>
 
 		{

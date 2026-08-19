@@ -5,12 +5,13 @@ import Button from '../ui/Button.astro';
 
 interface Props {
 	error?: string | null;
+	servingsError?: string | null;
 	value?: string;
 	title?: string;
 	servings?: number;
 }
 
-const { error = null, value = '', title = '', servings } = Astro.props;
+const { error = null, servingsError = null, value = '', title = '', servings } = Astro.props;
 // Only mark the field "server-filled" when we actually have a value from a submission (success or
 // error) to show back — otherwise the client restore script is free to pull the last-typed value
 // from sessionStorage on a fresh page load.
@@ -38,6 +39,7 @@ const EXAMPLE_PLACEHOLDER = '1 lb chicken breast\n2 cups all-purpose flour\n1 ts
 				value={servingsValue}
 				data-prefilled={servingsPrefilled ? 'true' : 'false'}
 			/>
+			{servingsError && <p class="text-body-sm text-error-deep mt-xxs">{servingsError}</p>}
 		</div>
 	</div>
 

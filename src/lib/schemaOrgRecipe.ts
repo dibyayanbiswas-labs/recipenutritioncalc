@@ -80,7 +80,10 @@ export async function extractRecipeFromUrl(rawUrl: string): Promise<SchemaOrgExt
 		return { ok: false, reason: "Couldn't fetch that page. Check the URL and try again." };
 	}
 
-	const scriptMatches = [...html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)];
+	// The type attribute's quotes are optional here — unquoted HTML attribute values are valid HTML
+	// and common in the wild (e.g. Yoast SEO, used by a large share of WordPress recipe sites, emits
+	// `<script type=application/ld+json class=yoast-schema-graph>` with no quotes at all).
+	const scriptMatches = [...html.matchAll(/<script[^>]*type=["']?application\/ld\+json["']?[^>]*>([\s\S]*?)<\/script>/gi)];
 
 	for (const match of scriptMatches) {
 		try {

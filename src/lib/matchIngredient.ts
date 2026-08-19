@@ -99,6 +99,7 @@ const COOKED_STATE_WORDS = new Set([
 	'seared',
 	'charred',
 	'rotisserie',
+	'microwaved',
 ]);
 
 /** Very light suffix stemming so "sugars"/"tomatoes"/"onions" match their singular query forms. */
@@ -145,10 +146,31 @@ const UNCOMMON_VARIANT_WORDS = new Set([
 	'black', // only demoted when the query itself doesn't say "black" (see the exemption below) —
 	// otherwise a plain "rice"/"pepper" query lands on the uncommon black-rice/variety entry purely
 	// because its qualifier chain happens to be shorter than the everyday white/standard version.
+	'turkey', // e.g. "bacon"/"sausage" defaulting to the turkey variant instead of the everyday
+	// (usually pork) one — same species-substitute problem as sheep/goat milk above.
 ]);
 // A recipe naming a plain ingredient almost always means its everyday fresh/liquid form, not a
 // shelf-stable processed variant — penalized only when the query doesn't ask for that form.
-const PROCESSED_FORM_WORDS = new Set(['dried', 'dry', 'powder', 'condensed', 'imitation', 'concentrate', 'dehydrated']);
+const PROCESSED_FORM_WORDS = new Set([
+	'dried',
+	'dry',
+	'powder',
+	'condensed',
+	'imitation',
+	'concentrate',
+	'dehydrated',
+	'canned',
+	'preserved',
+	'pickled',
+	'flavoured',
+	'flavored',
+]);
+// A short, specific named dish/product (e.g. "Spanish rice", "duchesse potatoes") can otherwise
+// out-rank the plain everyday ingredient purely because it has fewer qualifier tokens to be
+// penalized for, even though it's a completely different food (different prep, added ingredients,
+// often much higher sodium/fat) — not a description of the plain ingredient. Penalized only when
+// the query itself doesn't ask for that specific dish.
+const NAMED_DISH_WORDS = new Set(['spanish', 'duchesse']);
 
 // --- Inverted index, built once per Worker isolate (amortized across requests, not per-request cost) ---
 // Scoring always happens against an entry's full canonical NAME (never a short alias) — a short
@@ -248,11 +270,13 @@ export function matchIngredient(name: string, region?: RegionCode): IngredientMa
 		const hasRawWord = nameTokens.has('raw');
 		const hasUncommonVariantWord = [...nameTokens].some((t) => UNCOMMON_VARIANT_WORDS.has(t));
 		const hasProcessedFormWord = [...nameTokens].some((t) => PROCESSED_FORM_WORDS.has(t));
+		const hasNamedDishWord = [...nameTokens].some((t) => NAMED_DISH_WORDS.has(t));
 
 		const isOffType =
 			(hasCookedWord && !queryHasCookedWord) ||
 			(hasUncommonVariantWord && ![...queryTokens].some((t) => UNCOMMON_VARIANT_WORDS.has(t))) ||
-			(hasProcessedFormWord && ![...queryTokens].some((t) => PROCESSED_FORM_WORDS.has(t)));
+			(hasProcessedFormWord && ![...queryTokens].some((t) => PROCESSED_FORM_WORDS.has(t))) ||
+			(hasNamedDishWord && ![...queryTokens].some((t) => NAMED_DISH_WORDS.has(t)));
 
 		const primaryTokens = entryPrimaryTokens[entryIndex];
 		let primaryIntersection = 0;
@@ -281,6 +305,9 @@ export function matchIngredient(name: string, region?: RegionCode): IngredientMa
 			rankScore -= UNCOMMON_VARIANT_PENALTY;
 		}
 		if (hasProcessedFormWord && ![...queryTokens].some((t) => PROCESSED_FORM_WORDS.has(t))) {
+			rankScore -= UNCOMMON_VARIANT_PENALTY;
+		}
+		if (hasNamedDishWord && ![...queryTokens].some((t) => NAMED_DISH_WORDS.has(t))) {
 			rankScore -= UNCOMMON_VARIANT_PENALTY;
 		}
 		if (region && INGREDIENTS[entryIndex].region === region) {

@@ -5,9 +5,10 @@ import Button from '../ui/Button.astro';
 
 interface Props {
 	error?: string | null;
+	servingsError?: string | null;
 }
 
-const { error = null } = Astro.props;
+const { error = null, servingsError = null } = Astro.props;
 ---
 
 <form id="manual-form" method="POST" action={actions.analyzeManual} class="space-y-md">
@@ -19,6 +20,7 @@ const { error = null } = Astro.props;
 		<div>
 			<label for="manual-servings" class="text-body-sm-strong text-ink block mb-xxs">Servings</label>
 			<Input id="manual-servings" name="servings" type="number" value="1" />
+			{servingsError && <p class="text-body-sm text-error-deep mt-xxs">{servingsError}</p>}
 		</div>
 	</div>
 

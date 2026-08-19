@@ -19,7 +19,7 @@ export const server = {
 			// which would otherwise fail the base `z.string()` check with a raw "expected string,
 			// received null" error instead of the friendly message below — preprocess it back to ''.
 			text: z.preprocess((v) => v ?? '', z.string().min(1, 'Paste some ingredients first.')),
-			servings: z.coerce.number().min(1).max(100).default(1),
+			servings: z.coerce.number().min(1, 'Servings must be at least 1.').max(100, 'Servings can be at most 100.').default(1),
 			title: z.string().optional(),
 		}),
 		handler: async ({ text, servings, title }) => {
@@ -48,7 +48,11 @@ export const server = {
 		input: z.object({
 			// Same empty-field-becomes-null issue as analyzeText.text — see the comment there.
 			url: z.preprocess((v) => v ?? '', z.url('Enter a valid recipe URL.')),
-			servingsOverride: z.coerce.number().min(1).max(100).optional(),
+			servingsOverride: z.coerce
+				.number()
+				.min(1, 'Servings must be at least 1.')
+				.max(100, 'Servings can be at most 100.')
+				.optional(),
 		}),
 		handler: async ({ url, servingsOverride }) => {
 			const extracted = await extractRecipeFromUrl(url);
@@ -76,7 +80,7 @@ export const server = {
 		accept: 'form',
 		input: z.object({
 			title: z.string().optional(),
-			servings: z.coerce.number().min(1).max(100).default(1),
+			servings: z.coerce.number().min(1, 'Servings must be at least 1.').max(100, 'Servings can be at most 100.').default(1),
 			quantity: z.array(z.string()),
 			unit: z.array(z.string()),
 			name: z.array(z.string()),
