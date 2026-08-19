@@ -27,6 +27,15 @@ const {
 		<meta name="generator" content={Astro.generator} />
 		<title>{title}</title>
 		<meta name="description" content={description} />
+
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+		<meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
+		<meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<meta name="apple-mobile-web-app-title" content="Nutrition Calc" />
 		<script is:inline>
 			(function () {
 				var stored = localStorage.getItem('theme');
@@ -54,6 +63,16 @@ const {
 					// sessionStorage/Performance API can throw in locked-down privacy modes — best-effort.
 				}
 			})();
+		</script>
+		<script is:inline>
+			if ('serviceWorker' in navigator) {
+				window.addEventListener('load', function () {
+					navigator.serviceWorker.register('/sw.js').catch(function () {
+						// Registration can fail in private-browsing/locked-down contexts — the site still
+						// works fully without a service worker, so there's nothing to surface to the user.
+					});
+				});
+			}
 		</script>
 	</head>
 	<body class="min-h-screen flex flex-col">

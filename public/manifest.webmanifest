@@ -1,0 +1,32 @@
+{
+	"name": "Recipe Nutrition Calculator",
+	"short_name": "Nutrition Calc",
+	"description": "Paste a recipe, a URL, or a photo and get calories, full macros, and 20+ micronutrients per serving — free, no account, no paywall.",
+	"start_url": "/?source=pwa",
+	"scope": "/",
+	"display": "standalone",
+	"background_color": "#ffffff",
+	"theme_color": "#171717",
+	"orientation": "portrait-primary",
+	"categories": ["food", "health", "lifestyle", "utilities"],
+	"icons": [
+		{
+			"src": "/icons/icon-192.png",
+			"sizes": "192x192",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/icons/icon-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/icons/icon-maskable-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "maskable"
+		}
+	]
+}
