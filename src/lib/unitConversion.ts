@@ -55,6 +55,12 @@ const CATEGORY_G_PER_CUP: { keywords: string[]; gPerCup: number }[] = [
 	{ keywords: ['rolled oat', 'oats', 'quinoa', 'couscous', 'rice', 'grain'], gPerCup: 185 },
 	{ keywords: ['shredded cheese', 'grated cheese', 'grated parmesan', 'shredded parmesan'], gPerCup: 100 },
 	{ keywords: ['vegetable oil', 'olive oil', 'canola oil', 'sunflower oil', 'coconut oil', 'sesame oil'], gPerCup: 218 },
+	// Only reached when the matched entry itself has no gPerCup (some regional "Butter, unsalted"-style
+	// entries don't) — without this, a cup of butter fell all the way through to WATER_G_PER_ML
+	// (236.6g/cup), overstating the real ~227g/cup by about 4%. Checked last since earlier, more
+	// specific keywords ("peanut", "cocoa") already claim compound terms like "peanut butter"/"cocoa
+	// butter" first — this only ever fires for plain butter.
+	{ keywords: ['butter'], gPerCup: 227 },
 ];
 
 function estimateGPerCupFromName(name: string): number | null {

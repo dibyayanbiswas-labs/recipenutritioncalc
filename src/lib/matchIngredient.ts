@@ -79,7 +79,12 @@ export interface IngredientMatch {
 	ambiguous: boolean;
 }
 
-const STOP_WORDS = new Set(['a', 'an', 'the', 'of', 'and', 'or', 'fresh', 'large', 'small', 'medium']);
+// 'extra'/'virgin' added alongside the existing size/freshness words: "extra virgin olive oil" is one
+// of the most common ingredients in any recipe database, but the only matching entry is named "oil,
+// olive, salad or cooking" — without stripping these, the query's 4 tokens only ever cover 2 of the
+// entry's 4 (0.5), landing just under MIN_MATCH_COVERAGE and silently routing a hugely common
+// ingredient to the AI-estimate fallback instead of the accurate database entry.
+const STOP_WORDS = new Set(['a', 'an', 'the', 'of', 'and', 'or', 'fresh', 'large', 'small', 'medium', 'extra', 'virgin']);
 const COOKED_STATE_WORDS = new Set([
 	'cooked',
 	'baked',
@@ -180,14 +185,9 @@ const UNCOMMON_VARIANT_WORDS = new Set([
 	'mare',
 	'donkey',
 	'reindeer',
-	'meatless',
-	'vegetarian',
-	'vegan',
 	'black', // only demoted when the query itself doesn't say "black" (see the exemption below) —
 	// otherwise a plain "rice"/"pepper" query lands on the uncommon black-rice/variety entry purely
 	// because its qualifier chain happens to be shorter than the everyday white/standard version.
-	'turkey', // e.g. "bacon"/"sausage" defaulting to the turkey variant instead of the everyday
-	// (usually pork) one — same species-substitute problem as sheep/goat milk above.
 	// A bare "oil"/"vegetable oil" query means the everyday neutral cooking oil (canola/soybean,
 	// ~7-15g satFat/100g), not one of these extreme-satFat tropical oils (palm ~49g, palm kernel
 	// ~81.5g, coconut ~86.5g/100g) — but "vegetable oil, palm kernel" was winning anyway: its literal
@@ -198,6 +198,26 @@ const UNCOMMON_VARIANT_WORDS = new Set([
 	'kernel',
 	'coconut',
 ]);
+// Substitute-product words that need SUBSTITUTE_PRODUCT_PENALTY rather than UNCOMMON_VARIANT_PENALTY —
+// split out from the set above because these particular substitutes are disproportionately likely to
+// BE an entry's entire primary (pre-comma) segment ("bacon, meatless"; "mayonnaise, made with tofu";
+// "bacon, turkey, ..."), which already wins PRIMARY_MATCH_BONUS (0.5) outright against a same-food
+// entry like "pork, cured, bacon, unprepared" whose real identity sits in a later segment and gets no
+// primary bonus at all. UNCOMMON_VARIANT_PENALTY (0.15) doesn't come close to closing a gap that size,
+// so — like CONCENTRATE_WORDS/CONCENTRATE_PENALTY above — this needs a penalty large enough to actually
+// flip the ranking, not just nudge it. Demoted only when the query doesn't explicitly ask for the
+// substitute.
+const SUBSTITUTE_PRODUCT_WORDS = new Set([
+	'meatless',
+	'vegetarian',
+	'vegan',
+	'turkey', // e.g. "bacon"/"sausage" defaulting to the turkey variant instead of the everyday
+	// (usually pork) one — same species-substitute problem as sheep/goat milk above.
+	// A bare "mayonnaise" query means the everyday egg-based condiment, not a tofu-based substitute —
+	// same problem, just for a plant-based swap instead of an animal one.
+	'tofu',
+]);
+const SUBSTITUTE_PRODUCT_PENALTY = 0.5;
 // A recipe naming a plain ingredient almost always means its everyday fresh/liquid form, not a
 // shelf-stable processed variant — penalized only when the query doesn't ask for that form.
 const PROCESSED_FORM_WORDS = new Set([
@@ -214,6 +234,17 @@ const PROCESSED_FORM_WORDS = new Set([
 	'flavoured',
 	'flavored',
 ]);
+// A recipe naming a plain ingredient means the everyday, standard-sodium version — not a "reduced/low
+// sodium" reformulation — but the reformulated product often has a shorter, terser name than the
+// standard one (e.g. "milk, low sodium, fluid" vs. "milk, whole, 3.25% milkfat, with added vitamin d"),
+// so it wins the qualifier-count race for a bare "milk"/"bacon" query despite being a specialty product
+// with a wildly different sodium value (e.g. 3mg vs ~38mg sodium/100g for milk). Needs a penalty on the
+// same order as CONCENTRATE_PENALTY, not UNCOMMON_VARIANT_PENALTY: the standard entry frequently also
+// loses the primary-segment bonus to the specialty one (e.g. "bacon, pre-sliced, reduced/low sodium,
+// ..." vs. "pork, cured, bacon, ..." — "bacon" IS the specialty entry's primary segment, but only a late
+// qualifier in the standard USDA name), so a small nudge isn't enough to flip the ranking on its own.
+const SODIUM_MODIFIER_WORDS = new Set(['sodium']);
+const SODIUM_MODIFIER_PENALTY = 0.5;
 // A recipe volume like "500ml beef stock" means the diluted, ready-to-use liquid, but a cube/granules
 // entry is a concentrate meant to be DISSOLVED into that much liquid — scaling it as if it were the
 // liquid itself overstates sodium by roughly the dilution factor (~30-40x for a bouillon cube). This
@@ -373,6 +404,10 @@ export function matchIngredient(name: string, region?: RegionCode): IngredientMa
 		const hasNamedDishWord = [...nameTokens].some((t) => NAMED_DISH_WORDS.has(t));
 		const hasConcentrateWord = [...nameTokens].some((t) => CONCENTRATE_WORDS.has(t));
 		const queryHasConcentrateWord = [...queryTokens].some((t) => CONCENTRATE_WORDS.has(t));
+		const hasSodiumModifierWord = [...nameTokens].some((t) => SODIUM_MODIFIER_WORDS.has(t));
+		const queryHasSodiumModifierWord = [...queryTokens].some((t) => SODIUM_MODIFIER_WORDS.has(t));
+		const hasSubstituteProductWord = [...nameTokens].some((t) => SUBSTITUTE_PRODUCT_WORDS.has(t));
+		const queryHasSubstituteProductWord = [...queryTokens].some((t) => SUBSTITUTE_PRODUCT_WORDS.has(t));
 		// Unlike "black rice" (genuinely uncommon — 'black' is rightly demoted for a plain "rice"
 		// query), "black pepper" IS the plain, default sense of a bare "pepper" query — so the general
 		// black-variant demotion below would otherwise fight the bare-pepper spice tiebreak just above,
@@ -385,7 +420,9 @@ export function matchIngredient(name: string, region?: RegionCode): IngredientMa
 			(hasUncommonVariantWord && !isBarePepperBlackException && ![...queryTokens].some((t) => UNCOMMON_VARIANT_WORDS.has(t))) ||
 			(hasProcessedFormWord && ![...queryTokens].some((t) => PROCESSED_FORM_WORDS.has(t))) ||
 			(hasNamedDishWord && ![...queryTokens].some((t) => NAMED_DISH_WORDS.has(t))) ||
-			(hasConcentrateWord && !queryHasConcentrateWord);
+			(hasConcentrateWord && !queryHasConcentrateWord) ||
+			(hasSodiumModifierWord && !queryHasSodiumModifierWord) ||
+			(hasSubstituteProductWord && !queryHasSubstituteProductWord);
 
 		const primaryTokens = entryPrimaryTokens[entryIndex];
 		let primaryIntersection = 0;
@@ -438,6 +475,12 @@ export function matchIngredient(name: string, region?: RegionCode): IngredientMa
 		}
 		if (hasConcentrateWord && !queryHasConcentrateWord) {
 			rankScore -= CONCENTRATE_PENALTY;
+		}
+		if (hasSodiumModifierWord && !queryHasSodiumModifierWord) {
+			rankScore -= SODIUM_MODIFIER_PENALTY;
+		}
+		if (hasSubstituteProductWord && !queryHasSubstituteProductWord) {
+			rankScore -= SUBSTITUTE_PRODUCT_PENALTY;
 		}
 		if (region && INGREDIENTS[entryIndex].region === region) {
 			rankScore += REGION_MATCH_BONUS;

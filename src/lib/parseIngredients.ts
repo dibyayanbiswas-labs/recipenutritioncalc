@@ -16,6 +16,10 @@ export interface ParsedIngredientLine {
 
 const UNICODE_FRACTION_CHARS = Object.keys(UNICODE_FRACTIONS).join('');
 const UNIT_ALIAS_PATTERN = UNIT_ALIASES.map(escapeRegExp).join('|');
+// Count-class aliases only ("clove", "slice", "piece", ...) — see extractTrailingCountUnit below.
+const COUNT_UNIT_ALIAS_PATTERN = UNIT_ALIASES.filter((a) => UNIT_TABLE[a].unitClass === 'count')
+	.map(escapeRegExp)
+	.join('|');
 
 function escapeRegExp(s: string): string {
 	return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -168,6 +172,20 @@ function extractUnit(text: string): { unit: string | null; unitClass: UnitClass 
 		}
 	}
 	return { unit: null, unitClass: null, rest: text };
+}
+
+/** Fallback for a compound food noun whose natural word order puts the unit word at the very end
+ * instead of the front — "garlic clove", "bread slice" — rather than the front-anchored "1 clove
+ * garlic"/"1 slice bread" the primary extractUnit() pass expects. Only tried when that primary pass
+ * found no unit at all, and scoped to count-class units: those are the only ones naturally said this
+ * way ("2 flour cups" isn't idiomatic, but "1 garlic clove" is extremely common) — without this, "1
+ * garlic clove" fell through to a generic 100g count weight, ~30x the real ~3g of a single clove. */
+function extractTrailingCountUnit(text: string): { unit: string; rest: string } | null {
+	const match = text.match(new RegExp(`^(.+?)\\s+(${COUNT_UNIT_ALIAS_PATTERN})\\b\\.?\\s*$`, 'i'));
+	if (!match) return null;
+	const unitDef = UNIT_TABLE[match[2]] ?? UNIT_TABLE[match[2].toLowerCase()];
+	if (!unitDef) return null;
+	return { unit: unitDef.canonical, rest: match[1].trim() };
 }
 
 // A container noun ("cans", "boxes", ...) sometimes trails a weight/volume unit that's already fully
@@ -551,6 +569,13 @@ export function parseIngredientLine(raw: string): ParsedIngredientLine {
 		// the container ("2 cans beans", unitClass 'count'), this is skipped, since it's the real unit.
 		if (extractedUnit.unitClass && extractedUnit.unitClass !== 'count') {
 			working = working.replace(CONTAINER_NOISE_PATTERN, '');
+		}
+		if (!unit) {
+			const trailingUnit = extractTrailingCountUnit(working);
+			if (trailingUnit) {
+				unit = trailingUnit.unit;
+				working = trailingUnit.rest;
+			}
 		}
 	} else {
 		const implicitUnit = extractImplicitUnitQuantity(working);
