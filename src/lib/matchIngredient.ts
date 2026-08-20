@@ -233,11 +233,12 @@ const CONCENTRATE_PENALTY = 0.6;
 // entry: those are all named "Potatoes, french fried, ..." in the source data (potato as the head
 // noun, so they get no primary-segment bonus for a "french fries" query at all), so "french toast"'s
 // primary-segment credit for sharing "french" was otherwise enough to win outright.
-// 'cookie' (stemmed from "cookies") added because there's no raw "chocolate chips" entry in the
-// database at all — every "chocolate chip ___" row is a prepared dish (cookies, granola bars,
-// waffles) — so "chocolate chips" was winning against "Chocolate chip cookies" at high confidence
-// purely because "cookies" happened to be the only extra qualifier word. Demoting it here means a
-// genuinely unmatched raw ingredient correctly falls through to the AI-estimate fallback instead.
+// 'cookie' (stemmed from "cookies") added as a general demotion for dish-named entries competing
+// against a plain ingredient query. It alone isn't enough to fix "chocolate chips" specifically —
+// that took adding a properly-named "chocolate chips, semisweet" entry (see ingredients.json) so the
+// real ingredient scores its own PRIMARY_MATCH_BONUS instead of losing to whichever prepared dish
+// (cookies, waffles, granola bars, ...) happens to have the fewest qualifier words that day — but it
+// still helps in the general case where no such entry exists and the honest answer is "no match".
 const NAMED_DISH_WORDS = new Set(['spanish', 'duchesse', 'toast', 'cookie']);
 
 // --- Inverted index, built once per Worker isolate (amortized across requests, not per-request cost) ---
