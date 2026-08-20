@@ -42,15 +42,38 @@ function parseResponse(text: string): NutrientProfile | null {
 	return profile;
 }
 
-/** Asks Cloudflare Workers AI to estimate per-100g nutrition for an ingredient the local database couldn't match. Never throws — returns null on any failure so callers can fall back cleanly. */
-export async function estimateNutritionWithAI(ingredientName: string, ai: Ai): Promise<NutrientProfile | null> {
+function cacheKey(ingredientName: string): string {
+	return `ai-estimate:${ingredientName.trim().toLowerCase()}`;
+}
+
+/** Looks up a previously-cached AI estimate so a repeat ingredient (e.g. across different users' recipes) never has to spend a Workers AI call twice. */
+export async function getCachedEstimate(ingredientName: string, kv: KVNamespace): Promise<NutrientProfile | null> {
+	const raw = await kv.get(cacheKey(ingredientName));
+	if (!raw) return null;
+	try {
+		return JSON.parse(raw) as NutrientProfile;
+	} catch {
+		return null;
+	}
+}
+
+// No expirationTtl: a food's per-100g nutrition doesn't change, so once estimated it can be reused
+// forever — this is what keeps repeat ingredients from costing Neurons more than once.
+async function cacheEstimate(ingredientName: string, kv: KVNamespace, profile: NutrientProfile): Promise<void> {
+	await kv.put(cacheKey(ingredientName), JSON.stringify(profile));
+}
+
+/** Asks Cloudflare Workers AI to estimate per-100g nutrition for an ingredient the local database couldn't match, caching the result in KV when available. Never throws — returns null on any failure so callers can fall back cleanly. */
+export async function estimateNutritionWithAI(ingredientName: string, ai: Ai, kv?: KVNamespace): Promise<NutrientProfile | null> {
 	try {
 		const result = (await ai.run(ESTIMATE_MODEL, {
 			messages: [{ role: 'user', content: buildPrompt(ingredientName) }],
 			max_tokens: 256,
 		})) as { response?: string };
 		if (!result.response) return null;
-		return parseResponse(result.response);
+		const profile = parseResponse(result.response);
+		if (profile && kv) await cacheEstimate(ingredientName, kv, profile);
+		return profile;
 	} catch {
 		return null;
 	}

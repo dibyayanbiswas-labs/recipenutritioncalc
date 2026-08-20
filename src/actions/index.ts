@@ -36,6 +36,7 @@ export const server = {
 				servings,
 				createdAt: Date.now(),
 				ai: env.AI,
+				kv: env.RESULTS_KV,
 				formatWarning: formatCheck.ok ? null : (formatCheck.reason ?? null),
 			});
 			await saveResult(env.RESULTS_KV, result);
@@ -70,6 +71,7 @@ export const server = {
 				sourceUrl: url,
 				createdAt: Date.now(),
 				ai: env.AI,
+				kv: env.RESULTS_KV,
 			});
 			await saveResult(env.RESULTS_KV, result);
 			return result;
@@ -96,7 +98,7 @@ export const server = {
 				throw new ActionError({ code: 'BAD_REQUEST', message: 'Add at least one ingredient.' });
 			}
 
-			const ingredients = await analyzeIngredientLines(lines, env.AI);
+			const ingredients = await analyzeIngredientLines(lines, env.AI, env.RESULTS_KV);
 			const result = buildNutritionResult({
 				id,
 				title: title?.trim() || 'My recipe',

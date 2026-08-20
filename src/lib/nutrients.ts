@@ -2,7 +2,7 @@ import { matchIngredient, type MatchConfidence, type NutrientProfile } from './m
 import { parseIngredients, type ParsedIngredientLine } from './parseIngredients';
 import { resolveGrams, type ConversionSource } from './unitConversion';
 import { unionAllergens } from './allergens';
-import { estimateNutritionWithAI } from './aiEstimate';
+import { estimateNutritionWithAI, getCachedEstimate } from './aiEstimate';
 import {
 	DAILY_VALUES,
 	type HealthScore,
@@ -15,8 +15,10 @@ import {
 } from './nutrientMath';
 
 // Safety valve against a pathological input (e.g. a huge pasted blob of unmatchable lines)
-// triggering dozens of parallel Workers AI calls in a single request.
-const MAX_AI_FALLBACK_CALLS = 15;
+// triggering dozens of parallel Workers AI calls in a single request. Kept low to protect the
+// Workers AI free daily Neuron budget — cached estimates (see getCachedEstimate) don't count
+// against this, only calls that actually hit the model do.
+const MAX_AI_FALLBACK_CALLS = 5;
 
 export { DAILY_VALUES, type HealthScore };
 
@@ -57,7 +59,7 @@ export interface NutritionResult {
 }
 
 /** Resolves each parsed ingredient line into a nutrient contribution, using the bundled ingredient database, with a Workers AI estimate as a last-resort fallback for lines that don't match anything at all. */
-export async function analyzeIngredientLines(lines: ParsedIngredientLine[], ai?: Ai): Promise<IngredientResult[]> {
+export async function analyzeIngredientLines(lines: ParsedIngredientLine[], ai?: Ai, kv?: KVNamespace): Promise<IngredientResult[]> {
 	let aiCallsRemaining = MAX_AI_FALLBACK_CALLS;
 
 	return Promise.all(
@@ -71,9 +73,14 @@ export async function analyzeIngredientLines(lines: ParsedIngredientLine[], ai?:
 
 			let aiProfile: NutrientProfile | null = null;
 			let matchConfidence: MatchConfidence | 'none' | 'ai-estimated' = match?.confidence ?? 'none';
-			if (!entry && ai && !line.isOptionalOrToTaste && aiCallsRemaining > 0) {
-				aiCallsRemaining--;
-				aiProfile = await estimateNutritionWithAI(line.matchName, ai);
+			if (!entry && ai && !line.isOptionalOrToTaste) {
+				// Cache lookup is free (no Neurons spent) and doesn't touch the call budget below —
+				// only an actual model call does.
+				aiProfile = kv ? await getCachedEstimate(line.matchName, kv) : null;
+				if (!aiProfile && aiCallsRemaining > 0) {
+					aiCallsRemaining--;
+					aiProfile = await estimateNutritionWithAI(line.matchName, ai, kv);
+				}
 				if (aiProfile) matchConfidence = 'ai-estimated';
 			}
 
@@ -141,10 +148,11 @@ export async function analyzeRecipeText(params: {
 	sourceUrl?: string | null;
 	createdAt: number;
 	ai?: Ai;
+	kv?: KVNamespace;
 	formatWarning?: string | null;
 }): Promise<NutritionResult> {
-	const { ai, formatWarning, ...rest } = params;
+	const { ai, kv, formatWarning, ...rest } = params;
 	const lines = parseIngredients(params.text);
-	const ingredients = await analyzeIngredientLines(lines, ai);
+	const ingredients = await analyzeIngredientLines(lines, ai, kv);
 	return buildNutritionResult({ ...rest, ingredients, formatWarning });
 }
