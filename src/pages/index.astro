@@ -77,7 +77,7 @@ if (manualResult) {
 const flash = await Astro.session?.get<FormFlash>('formFlash');
 if (flash) Astro.session?.delete('formFlash');
 
-const activeTab: 'paste' | 'url' | 'manual' = flash?.tab ?? 'manual';
+const activeTab: 'paste' | 'url' | 'manual' = flash?.tab ?? 'paste';
 const textError = flash?.tab === 'paste' ? (flash.error ?? null) : null;
 const urlError = flash?.tab === 'url' ? (flash.error ?? null) : null;
 const manualError = flash?.tab === 'manual' ? (flash.error ?? null) : null;
@@ -90,7 +90,7 @@ const steps = [
 	{
 		n: '01',
 		title: 'Paste, link, or snap a photo',
-		body: 'Type your ingredient list, drop in a recipe URL, or upload a photo of a printed or handwritten one. No reformatting needed.',
+		body: 'Type your ingredient list one per line, drop in a link to a specific recipe page, or upload a clear photo of a printed or handwritten one.',
 	},
 	{
 		n: '02',
@@ -183,6 +183,9 @@ const appStructuredData = {
 				urlServingsError={urlServingsError}
 				manualServingsError={manualServingsError}
 			/>
+			<p class="text-body-sm text-ink bg-canvas-soft-2 border border-hairline rounded-sm px-sm py-xs mt-md">
+				<strong>Not sure what to paste, link, or upload?</strong> See <a href="/how-it-works#tips-for-each-way-to-add-a-recipe" class="text-link hover:underline">tips for each input method</a> or the <a href="/faq" class="text-link hover:underline">FAQ</a>.
+			</p>
 		</Card>
 
 		{

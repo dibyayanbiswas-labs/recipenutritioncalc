@@ -14,13 +14,33 @@ const { error = null, servingsError = null, value = '' } = Astro.props;
 
 <form method="POST" action={actions.analyzeUrl} class="space-y-md">
 	<div>
-		<label for="recipe-url" class="text-body-sm-strong text-ink block mb-xxs">Recipe URL</label>
+		<div class="flex items-center gap-xs mb-xxs">
+			<label for="recipe-url" class="text-body-sm-strong text-ink">Recipe URL</label>
+			<button
+				type="button"
+				id="url-format-info-toggle"
+				aria-expanded="false"
+				aria-controls="url-format-info-panel"
+				aria-label="URL help"
+				class="shrink-0 h-5 w-5 rounded-full bg-black text-white hover:opacity-80 text-caption flex items-center justify-center"
+			>
+				i
+			</button>
+		</div>
+		<p class="text-caption text-warning-deep font-medium mb-xxs">
+			Link straight to the recipe page itself — not the site's homepage or a search results page.
+		</p>
+		<div
+			id="url-format-info-panel"
+			role="note"
+			class="hidden text-caption text-body bg-canvas-soft-2 border border-hairline rounded-sm p-sm mb-xs space-y-xxs"
+		>
+			<p><strong class="text-ink">Use the exact page for one recipe</strong>, e.g. <span class="font-mono">https://example.com/recipes/chicken-curry</span> — not the homepage, a category page, or a roundup listing several recipes.</p>
+			<p>We look for the structured recipe data most recipe blogs and major recipe sites embed (the same data Google uses for recipe search results). Not every site publishes it.</p>
+			<p>Some sites block automated requests outright, even when they do publish that data — you may see a "Couldn't fetch that page" error. If that happens, open the page yourself, copy the ingredient list, and use Paste text instead.</p>
+		</div>
 		<Input id="recipe-url" name="url" type="url" required placeholder="https://example.com/my-recipe" value={value} />
 		{error && <p class="text-body-sm text-error-deep mt-xxs">{error}</p>}
-		<p class="text-caption text-mute mt-xxs">
-			We look for the structured recipe data most recipe sites embed. If a site doesn't have it, try pasting
-			the ingredients instead.
-		</p>
 	</div>
 	<div class="max-w-[200px]">
 		<label for="url-servings" class="text-body-sm-strong text-ink block mb-xxs">Servings override (optional)</label>
@@ -38,6 +58,14 @@ const { error = null, servingsError = null, value = '' } = Astro.props;
 
 	const urlInput = document.getElementById('recipe-url') as HTMLInputElement | null;
 	const servingsInput = document.getElementById('url-servings') as HTMLInputElement | null;
+
+	const urlInfoToggle = document.getElementById('url-format-info-toggle');
+	const urlInfoPanel = document.getElementById('url-format-info-panel');
+	urlInfoToggle?.addEventListener('click', () => {
+		const isOpen = !urlInfoPanel?.classList.contains('hidden');
+		urlInfoPanel?.classList.toggle('hidden', isOpen);
+		urlInfoToggle?.setAttribute('aria-expanded', String(!isOpen));
+	});
 
 	document.getElementById('url-start-over')?.addEventListener('click', () => {
 		if (urlInput) urlInput.value = '';

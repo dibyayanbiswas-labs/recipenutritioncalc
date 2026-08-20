@@ -32,6 +32,18 @@ const faqs = [
 		a: 'Yes — upload a photo of a printed or handwritten recipe and it\'s transcribed and parsed the same way as pasted text, then run through the same database matching and calculation.',
 	},
 	{
+		q: 'What kind of photo should I upload?',
+		a: 'Photograph the ingredient list itself — a recipe card, cookbook page, or printout — not the finished dish. Printed text is read most reliably; keep the shot in focus, well-lit, and free of glare so the transcription comes out clean. You\'ll get to review and fix the transcribed text before anything is calculated.',
+	},
+	{
+		q: 'What kind of URL should I paste — why do some recipe links fail?',
+		a: 'Use the URL of the specific recipe page itself, not a site\'s homepage, category page, or a roundup listing multiple recipes. We look for the structured recipe data most recipe sites embed for Google\'s recipe search results — if a page doesn\'t have it, the import won\'t work. Some sites also block automated requests outright (you may see a "couldn\'t fetch that page" error) even when they do publish that data. Either way, open the page yourself, copy the ingredient list, and use Paste text instead.',
+	},
+	{
+		q: 'What format should I paste my ingredients in?',
+		a: 'One ingredient per line, as quantity, unit, then name — e.g. "2 cups flour" or "1 lb chicken breast". Putting two ingredients on one line is the most common cause of a wrong result, so double-check the format before you submit — calculation happens immediately, with no review step in between.',
+	},
+	{
 		q: 'Is this completely AI calculated?',
 		a: 'No. Nutrition values are matched against a USDA-derived database first. AI is only used as a fallback when an ingredient isn\'t in that database, and those lines are clearly flagged as AI-estimated rather than blended in silently.',
 	},

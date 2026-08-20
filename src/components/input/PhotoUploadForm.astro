@@ -4,7 +4,32 @@ import Button from '../ui/Button.astro';
 
 <form id="photo-form" class="space-y-md">
 	<div>
-		<label for="photo-input" class="text-body-sm-strong text-ink block mb-xxs">Upload a photo of the recipe</label>
+		<div class="flex items-center gap-xs mb-xxs">
+			<label for="photo-input" class="text-body-sm-strong text-ink">Upload a photo of the recipe</label>
+			<button
+				type="button"
+				id="photo-format-info-toggle"
+				aria-expanded="false"
+				aria-controls="photo-format-info-panel"
+				aria-label="Photo help"
+				class="shrink-0 h-5 w-5 rounded-full bg-black text-white hover:opacity-80 text-caption flex items-center justify-center"
+			>
+				i
+			</button>
+		</div>
+		<p class="text-caption text-warning-deep font-medium mb-xxs">
+			Photograph the ingredient list itself, in focus and well-lit — not a photo of the finished dish.
+		</p>
+		<div
+			id="photo-format-info-panel"
+			role="note"
+			class="hidden text-caption text-body bg-canvas-soft-2 border border-hairline rounded-sm p-sm mb-xs space-y-xxs"
+		>
+			<p><strong class="text-ink">Frame just the ingredients section</strong> — a cookbook page, recipe card, or printout, not the whole recipe card from a distance and not a photo of the cooked meal.</p>
+			<p>Printed text is read most reliably. Legible handwriting works too, but the less clear it is, the more you'll need to fix in the review step.</p>
+			<p>Avoid glare, blur, and steep angles — straight-on and well-lit gets the best transcription.</p>
+			<p class="text-mute">You'll get a chance to review the transcribed text (and fix anything misread) before we calculate.</p>
+		</div>
 		<input
 			id="photo-input"
 			name="image"
@@ -13,10 +38,6 @@ import Button from '../ui/Button.astro';
 			required
 			class="w-full text-body-sm text-body file:mr-sm file:h-9 file:px-sm file:rounded-pill file:border-0 file:bg-primary file:text-on-primary file:text-button-md"
 		/>
-		<p class="text-caption text-mute mt-xxs">
-			Printed text works best. We'll show you the transcribed ingredients to review and correct before
-			calculating, in case anything gets misread.
-		</p>
 	</div>
 	<p id="photo-error" class="text-body-sm text-error-deep hidden"></p>
 	<div class="flex items-center gap-md">
@@ -37,6 +58,14 @@ import Button from '../ui/Button.astro';
 	const fileInput = document.getElementById('photo-input') as HTMLInputElement;
 	const submitBtn = document.getElementById('photo-submit') as HTMLButtonElement;
 	const errorEl = document.getElementById('photo-error')!;
+
+	const photoInfoToggle = document.getElementById('photo-format-info-toggle');
+	const photoInfoPanel = document.getElementById('photo-format-info-panel');
+	photoInfoToggle?.addEventListener('click', () => {
+		const isOpen = !photoInfoPanel?.classList.contains('hidden');
+		photoInfoPanel?.classList.toggle('hidden', isOpen);
+		photoInfoToggle?.setAttribute('aria-expanded', String(!isOpen));
+	});
 
 	submitBtn.addEventListener('click', async () => {
 		errorEl.classList.add('hidden');

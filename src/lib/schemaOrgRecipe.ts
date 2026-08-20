@@ -69,6 +69,12 @@ export async function extractRecipeFromUrl(rawUrl: string): Promise<SchemaOrgExt
 		});
 		clearTimeout(timeout);
 		if (!response.ok) {
+			if (response.status === 403 || response.status === 401) {
+				return {
+					ok: false,
+					reason: 'This site is blocking automated requests, so we can\'t fetch that page. Open it in your browser, copy the ingredient list, and use Paste text instead.',
+				};
+			}
 			return { ok: false, reason: `Couldn't fetch that page (status ${response.status}).` };
 		}
 		const buffer = await response.arrayBuffer();

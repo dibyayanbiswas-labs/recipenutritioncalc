@@ -53,12 +53,47 @@ import Card from '../components/ui/Card.astro';
 		</Card>
 
 		<Card variant="marketing">
-			<h2 class="text-display-sm text-ink mb-xs">URL import</h2>
-			<p class="text-body-md text-body">
-				We look for the structured "Recipe" data (schema.org JSON-LD) that most recipe sites embed for
-				Google's recipe search results. If a site doesn't publish that data, URL import won't work for it —
-				paste the ingredients directly instead.
-			</p>
+			<h2 id="tips-for-each-way-to-add-a-recipe" class="text-display-sm text-ink mb-xs scroll-mt-24">Tips for each way to add a recipe</h2>
+			<div class="space-y-md">
+				<div>
+					<h3 class="text-body-md-strong text-ink mb-xxs">Paste text</h3>
+					<p class="text-body-md text-body">
+						One ingredient per line, written as <strong>quantity, unit, name</strong> — e.g.{' '}
+						<span class="font-mono">2 cups flour</span> or <span class="font-mono">1 lb chicken breast</span>.
+						Combining two ingredients on one line is the most common cause of a wrong result — calculation
+						happens as soon as you submit, with no review step in between, so it's worth getting the
+						format right first.
+					</p>
+				</div>
+				<div>
+					<h3 class="text-body-md-strong text-ink mb-xxs">Manual entry</h3>
+					<p class="text-body-md text-body">
+						Fill in quantity, unit, and name as separate fields, one ingredient per row. Leave the unit
+						blank for counted items (e.g. <span class="font-mono">2</span> eggs), and leave quantity blank
+						for to-taste seasonings.
+					</p>
+				</div>
+				<div>
+					<h3 class="text-body-md-strong text-ink mb-xxs">URL import</h3>
+					<p class="text-body-md text-body">
+						We look for the structured "Recipe" data (schema.org JSON-LD) that most recipe sites embed for
+						Google's recipe search results — so the URL needs to point straight at one recipe's page, not a
+						homepage, category page, or roundup of several recipes. If a site doesn't publish that data,
+						URL import won't work for it. Some sites also block automated requests outright (you may see a
+						"couldn't fetch that page" error) even when they do publish the data — if that happens, open
+						the page yourself and paste the ingredients directly instead.
+					</p>
+				</div>
+				<div>
+					<h3 class="text-body-md-strong text-ink mb-xxs">Photo upload</h3>
+					<p class="text-body-md text-body">
+						Photograph the ingredient list itself — a recipe card, cookbook page, or printout — not the
+						finished dish. Printed text transcribes most reliably; keep the shot in focus, well-lit, and
+						free of glare. You'll review the transcribed text and can fix any misread lines before
+						calculating.
+					</p>
+				</div>
+			</div>
 		</Card>
 
 		<Card variant="marketing">

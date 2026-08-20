@@ -24,6 +24,32 @@ const { error = null, servingsError = null } = Astro.props;
 		</div>
 	</div>
 
+	<div class="flex items-center gap-xs mb-xxs">
+		<p class="text-body-sm-strong text-ink">Ingredients</p>
+		<button
+			type="button"
+			id="manual-format-info-toggle"
+			aria-expanded="false"
+			aria-controls="manual-format-info-panel"
+			aria-label="Manual entry help"
+			class="shrink-0 h-5 w-5 rounded-full bg-black text-white hover:opacity-80 text-caption flex items-center justify-center"
+		>
+			i
+		</button>
+	</div>
+	<p class="text-caption text-warning-deep font-medium mb-xxs">
+		One ingredient per row, split into quantity, unit, and name — e.g. <span class="font-mono">2</span> /
+		<span class="font-mono">cups</span> / <span class="font-mono">basmati rice</span>.
+	</p>
+	<div
+		id="manual-format-info-panel"
+		role="note"
+		class="hidden text-caption text-body bg-canvas-soft-2 border border-hairline rounded-sm p-sm mb-xs space-y-xxs"
+	>
+		<p><strong class="text-ink">Quantity</strong> is a number (fractions like <span class="font-mono">1/2</span> work too). <strong class="text-ink">Unit</strong> is things like <span class="font-mono">cups</span>, <span class="font-mono">tbsp</span>, <span class="font-mono">oz</span>, or <span class="font-mono">g</span>.</p>
+		<p>Counting items instead of measuring? Leave unit blank — e.g. <span class="font-mono">2</span> / (blank) / <span class="font-mono">eggs</span>.</p>
+		<p>No set amount? Leave quantity blank and put it in the name, e.g. (blank) / (blank) / <span class="font-mono">salt to taste</span>.</p>
+	</div>
 	<div id="manual-rows" class="space-y-xs">
 		<div class="grid grid-cols-[80px_100px_1fr_36px] gap-xs items-center" data-row>
 			<Input name="quantity" placeholder="2" />
@@ -76,6 +102,14 @@ const { error = null, servingsError = null } = Astro.props;
 	const addRowBtn = document.getElementById('add-row')!;
 	const titleInput = document.getElementById('manual-title') as HTMLInputElement | null;
 	const servingsInput = document.getElementById('manual-servings') as HTMLInputElement | null;
+
+	const manualInfoToggle = document.getElementById('manual-format-info-toggle');
+	const manualInfoPanel = document.getElementById('manual-format-info-panel');
+	manualInfoToggle?.addEventListener('click', () => {
+		const isOpen = !manualInfoPanel?.classList.contains('hidden');
+		manualInfoPanel?.classList.toggle('hidden', isOpen);
+		manualInfoToggle?.setAttribute('aria-expanded', String(!isOpen));
+	});
 
 	const ROWS_KEY = 'recipeCalc:manualRows';
 	const TITLE_KEY = 'recipeCalc:manualTitle';
