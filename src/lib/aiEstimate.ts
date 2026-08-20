@@ -1,9 +1,10 @@
 import type { NutrientProfile } from './matchIngredient';
 
 // A small, cheap instruct model — this is a short structured-JSON task, not the vision OCR path,
-// so it doesn't need a large model. Re-check developers.cloudflare.com/workers-ai/models/ if this
-// ever needs swapping; the catalog moves.
-const ESTIMATE_MODEL = '@cf/meta/llama-3.1-8b-instruct';
+// so it doesn't need a large model. @cf/meta/llama-3.1-8b-instruct was deprecated 2026-05-30 (error
+// 5028); -fast is its non-deprecated successor backend. Re-check
+// developers.cloudflare.com/workers-ai/models/ if this ever needs swapping again; the catalog moves.
+const ESTIMATE_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast';
 
 const CORE_KEYS = ['kcal', 'protein_g', 'fat_g', 'satFat_g', 'carbs_g', 'fiber_g', 'sugar_g', 'sodium_mg'] as const;
 
@@ -79,7 +80,10 @@ export async function estimateNutritionWithAI(ingredientName: string, ai: Ai, kv
 		const profile = parseResponse(result.response);
 		if (profile && kv) await cacheEstimate(ingredientName, kv, profile);
 		return profile;
-	} catch {
+	} catch (err) {
+		// Logged so a future model deprecation/shape change shows up in `wrangler tail` instead of
+		// silently degrading every unmatched ingredient to zero nutrition.
+		console.error('estimateNutritionWithAI: Workers AI call failed', err);
 		return null;
 	}
 }
