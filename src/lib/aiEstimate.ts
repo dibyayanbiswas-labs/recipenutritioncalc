@@ -18,17 +18,22 @@ function buildPrompt(ingredientName: string): string {
 	].join('\n');
 }
 
-function parseResponse(text: string): NutrientProfile | null {
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(text.trim());
-	} catch {
-		const match = text.match(/\{[\s\S]*\}/);
-		if (!match) return null;
+// Workers AI returns `response` as a plain string for most models, but when the model's output is
+// valid JSON, the platform pre-parses it into an object before handing it back — so this has to accept
+// either shape rather than assuming a string to call .trim()/.match() on.
+function parseResponse(response: string | Record<string, unknown>): NutrientProfile | null {
+	let parsed: unknown = response;
+	if (typeof response === 'string') {
 		try {
-			parsed = JSON.parse(match[0]);
+			parsed = JSON.parse(response.trim());
 		} catch {
-			return null;
+			const match = response.match(/\{[\s\S]*\}/);
+			if (!match) return null;
+			try {
+				parsed = JSON.parse(match[0]);
+			} catch {
+				return null;
+			}
 		}
 	}
 	if (typeof parsed !== 'object' || parsed === null) return null;
@@ -69,7 +74,7 @@ export async function estimateNutritionWithAI(ingredientName: string, ai: Ai, kv
 		const result = (await ai.run(ESTIMATE_MODEL, {
 			messages: [{ role: 'user', content: buildPrompt(ingredientName) }],
 			max_tokens: 256,
-		})) as { response?: string };
+		})) as { response?: string | Record<string, unknown> };
 		if (!result.response) return null;
 		const profile = parseResponse(result.response);
 		if (profile && kv) await cacheEstimate(ingredientName, kv, profile);
