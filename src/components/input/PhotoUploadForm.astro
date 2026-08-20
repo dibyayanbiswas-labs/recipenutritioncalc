@@ -62,6 +62,69 @@ import Button from '../ui/Button.astro';
 		photoInfoToggle?.setAttribute('aria-expanded', String(!isOpen));
 	});
 
+	// A full-resolution mobile camera photo is routinely 3-12MB at 3000-4000px on a side — converted to a
+	// byte array and sent to Workers AI as-is, that's easily enough to blow the Worker's memory limit
+	// ("exceeded maximum capacity"), long before the model even sees it. Recipe text is legible in a photo
+	// at a fraction of that resolution, so shrink client-side before it ever leaves the browser. A file
+	// already this small (typical of a screenshot) is left untouched — re-encoding it would only cost
+	// quality for no size benefit.
+	const SKIP_RESIZE_BELOW_BYTES = 1.5 * 1024 * 1024;
+	const MAX_DIMENSION_PX = 1600;
+	const JPEG_QUALITY = 0.82;
+	// Final safety net for anything resizing couldn't shrink (e.g. createImageBitmap unsupported) —
+	// matches the server's own cap in src/actions/index.ts, so an oversized photo is rejected instantly
+	// in the browser instead of round-tripping to the Worker just to be rejected there.
+	const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+
+	async function prepareImageForUpload(file: File): Promise<File> {
+		if (file.size <= SKIP_RESIZE_BELOW_BYTES) return file;
+
+		try {
+			const bitmap = await createImageBitmap(file);
+			const scale = Math.min(1, MAX_DIMENSION_PX / Math.max(bitmap.width, bitmap.height));
+			const width = Math.max(1, Math.round(bitmap.width * scale));
+			const height = Math.max(1, Math.round(bitmap.height * scale));
+
+			const canvas = document.createElement('canvas');
+			canvas.width = width;
+			canvas.height = height;
+			const ctx = canvas.getContext('2d');
+			if (!ctx) return file;
+			ctx.drawImage(bitmap, 0, 0, width, height);
+			bitmap.close();
+
+			const blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY));
+			if (!blob || blob.size >= file.size) return file;
+			const jpgName = file.name.replace(/\.[^.]+$/, '') + '.jpg';
+			return new File([blob], jpgName, { type: 'image/jpeg' });
+		} catch {
+			// Best-effort optimization only — if anything about resizing fails (unsupported format,
+			// memory pressure), fall back to the original file rather than blocking the upload entirely.
+			return file;
+		}
+	}
+
+	// The astro:actions client has no way to pass an AbortSignal through, so a stuck request (observed
+	// in practice: the server responds but the client-side handler never resolves) would otherwise leave
+	// the button disabled forever with no way to retry. Race it against a generous timeout instead, so
+	// the UI always recovers even if the underlying request never does.
+	const RESPONSE_TIMEOUT_MS = 45_000;
+	function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+		return new Promise((resolve, reject) => {
+			const timer = setTimeout(() => reject(new Error('timeout')), ms);
+			promise.then(
+				(v) => {
+					clearTimeout(timer);
+					resolve(v);
+				},
+				(e) => {
+					clearTimeout(timer);
+					reject(e);
+				},
+			);
+		});
+	}
+
 	submitBtn.addEventListener('click', async () => {
 		errorEl.classList.add('hidden');
 		const file = fileInput.files?.[0];
@@ -72,28 +135,41 @@ import Button from '../ui/Button.astro';
 		}
 
 		const originalLabel = submitBtn.textContent;
-		submitBtn.textContent = 'Reading photo…';
+		submitBtn.textContent = 'Preparing photo…';
 		submitBtn.setAttribute('disabled', 'true');
 
-		const formData = new FormData();
-		formData.set('image', file);
-		const { data, error } = await actions.transcribeImage(formData);
-
-		submitBtn.textContent = originalLabel;
-		submitBtn.removeAttribute('disabled');
-
-		if (error) {
-			errorEl.textContent = error.message;
-			errorEl.classList.remove('hidden');
-			return;
-		}
-
-		if (data) {
-			const textarea = document.getElementById('ingredient-textarea') as HTMLTextAreaElement | null;
-			if (textarea) {
-				textarea.value = data.text;
+		try {
+			const prepared = await prepareImageForUpload(file);
+			if (prepared.size > MAX_UPLOAD_BYTES) {
+				errorEl.textContent = "That photo is too large even after compression — try cropping it to just the ingredient list, or paste the ingredients instead.";
+				errorEl.classList.remove('hidden');
+				return;
 			}
-			window.activateInputTab?.('paste');
+
+			submitBtn.textContent = 'Reading photo…';
+			const formData = new FormData();
+			formData.set('image', prepared);
+			const { data, error } = await withTimeout(actions.transcribeImage(formData), RESPONSE_TIMEOUT_MS);
+
+			if (error) {
+				errorEl.textContent = error.message;
+				errorEl.classList.remove('hidden');
+				return;
+			}
+
+			if (data) {
+				const textarea = document.getElementById('ingredient-textarea') as HTMLTextAreaElement | null;
+				if (textarea) {
+					textarea.value = data.text;
+				}
+				window.activateInputTab?.('paste');
+			}
+		} catch {
+			errorEl.textContent = "That's taking longer than expected. Check your connection and try again, or paste the ingredients instead.";
+			errorEl.classList.remove('hidden');
+		} finally {
+			submitBtn.textContent = originalLabel;
+			submitBtn.removeAttribute('disabled');
 		}
 	});
 

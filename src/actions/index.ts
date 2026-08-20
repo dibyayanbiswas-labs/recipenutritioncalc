@@ -16,6 +16,14 @@ const OCR_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
 // transcribeImage handler's temperature/prompt comments for why this is needed at all).
 const NO_TEXT_SENTINEL = 'NONE';
 
+// A full-resolution mobile camera photo can be several MB — read into a Uint8Array and then spread into
+// a plain number array for the AI binding (see transcribeImage below), that's easily enough to exceed
+// the Worker's memory limit ("exceeded maximum capacity") before the model ever sees it. The client
+// resizes photos above this size before upload (see PhotoUploadForm.astro), so this is a safety net for
+// whatever gets here anyway — a non-JS client, or a resize that silently failed — returning a clear
+// error instead of risking an out-of-memory crash.
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
 export const server = {
 	analyzeText: defineAction({
 		accept: 'form',
@@ -134,6 +142,12 @@ export const server = {
 		handler: async ({ image }) => {
 			if (!image.type.startsWith('image/')) {
 				throw new ActionError({ code: 'BAD_REQUEST', message: 'Please upload an image file.' });
+			}
+			if (image.size > MAX_IMAGE_BYTES) {
+				throw new ActionError({
+					code: 'BAD_REQUEST',
+					message: 'That image is too large (max 8MB). Try a smaller photo, or paste the ingredients instead.',
+				});
 			}
 
 			const bytes = new Uint8Array(await image.arrayBuffer());

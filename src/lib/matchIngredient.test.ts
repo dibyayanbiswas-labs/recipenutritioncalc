@@ -73,4 +73,13 @@ describe('matchIngredient — regression: bare-word and off-type mismatches', ()
 		expect(m?.entry.name.toLowerCase()).not.toContain('toast');
 		expect(m?.entry.name.toLowerCase()).toContain('french fried');
 	});
+
+	it('"kosher salt" and "sea salt" match table salt instead of missing coverage by one descriptor word', () => {
+		const plain = matchIngredient('salt', 'US');
+		const kosher = matchIngredient('kosher salt', 'US');
+		const sea = matchIngredient('sea salt', 'US');
+		expect(kosher?.entry.name).toBe(plain?.entry.name);
+		expect(sea?.entry.name).toBe(plain?.entry.name);
+		expect(kosher?.confidence).not.toBe('low');
+	});
 });

@@ -40,7 +40,11 @@ export async function exportElementAsPdf(targetId: string, filename: string): Pr
 			pageCtx.drawImage(canvas, 0, renderedPx, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
 
 			if (pageIndex > 0) pdf.addPage();
-			pdf.addImage(pageCanvas.toDataURL('image/png'), 'PNG', margin, margin, contentWidth, sliceHeight * scale);
+			// JPEG rather than PNG: this is a mostly-flat, mostly-text page, where PNG's lossless
+			// encoding costs several MB for no real quality benefit over a high-quality JPEG — a results
+			// page that's almost entirely macro/micronutrient text was measured at ~5MB as PNG vs. a few
+			// hundred KB at quality 0.92, with no visible difference at normal zoom.
+			pdf.addImage(pageCanvas.toDataURL('image/jpeg', 0.92), 'JPEG', margin, margin, contentWidth, sliceHeight * scale);
 
 			renderedPx += sliceHeight;
 			pageIndex++;

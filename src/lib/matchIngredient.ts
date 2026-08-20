@@ -241,6 +241,13 @@ const CONCENTRATE_PENALTY = 0.6;
 // still helps in the general case where no such entry exists and the honest answer is "no match".
 const NAMED_DISH_WORDS = new Set(['spanish', 'duchesse', 'toast', 'cookie']);
 
+// Salt-type descriptors that don't correspond to a distinct database entry — there's only ever one
+// "salt, table" entry, covering all of these culinarily-different-but-nutritionally-identical forms.
+// Without stripping them, "kosher salt"/"sea salt" (2 query tokens, only "salt" itself present in the
+// entry's 2-token name) land at exactly 0.5 coverage — just under MIN_MATCH_COVERAGE — and fall
+// through to a much less accurate AI estimate for one of the most common savory recipe ingredients.
+const SALT_DESCRIPTOR_WORDS = new Set(['kosher', 'sea', 'fine', 'coarse', 'flaky', 'flake', 'rock', 'iodized', 'himalayan', 'pink']);
+
 // --- Inverted index, built once per Worker isolate (amortized across requests, not per-request cost) ---
 // Scoring always happens against an entry's full canonical NAME (never a short alias) — a short
 // alias like "oil" or "spices" would otherwise win matches purely by having few tokens to penalize,
@@ -320,6 +327,9 @@ const AMBIGUITY_KCAL_SPREAD = 40;
  * ingredients may still fall back to another region's entry when the preferred region has no reasonable match. */
 export function matchIngredient(name: string, region?: RegionCode): IngredientMatch | null {
 	const queryTokens = tokenize(name);
+	if (queryTokens.has('salt')) {
+		for (const w of SALT_DESCRIPTOR_WORDS) queryTokens.delete(w);
+	}
 	if (queryTokens.size === 0) return null;
 
 	const queryHasCookedWord = [...queryTokens].some((t) => COOKED_STATE_WORDS.has(t));
