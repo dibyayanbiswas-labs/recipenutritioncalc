@@ -426,9 +426,16 @@ export function matchIngredient(name: string, region?: RegionCode): IngredientMa
 		}
 	}
 
-	if (bestEntryIndex === -1) return null;
+	// Below this, only a minority of the query's words are actually present in the candidate's name —
+	// e.g. "kelp noodles" sharing just "noodles" with "chow mein noodles" (0.5 coverage), or "dragon
+	// fruit chunks" sharing just "fruit" with "fruit syrup" (0.33). Returning a low-coverage guess here
+	// used to present a wrong nutrition profile with a confident-looking label; returning null instead
+	// routes the caller to the (KV-cached) AI-estimate fallback, which is more accurate for a genuinely
+	// unmatched ingredient than a database entry that only superficially shares a word.
+	const MIN_MATCH_COVERAGE = 0.51;
+	if (bestEntryIndex === -1 || bestCoverage < MIN_MATCH_COVERAGE) return null;
 
-	const confidence: MatchConfidence = bestCoverage >= 0.9 ? 'high' : bestCoverage >= 0.5 ? 'medium' : 'low';
+	const confidence: MatchConfidence = bestCoverage >= 0.9 ? 'high' : 'medium';
 
 	// A near-tied runner-up only matters if picking it instead would actually change the nutrition
 	// result — e.g. picking cheddar over swiss cheese matters, picking one region's "chicken breast,
