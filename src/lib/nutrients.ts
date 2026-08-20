@@ -62,14 +62,18 @@ export async function analyzeIngredientLines(lines: ParsedIngredientLine[], ai?:
 
 	return Promise.all(
 		lines.map(async (line) => {
-			const match = matchIngredient(line.ingredientName);
+			// Defaults to 'US': the site's %DV table is US/USDA-based and there's no region picker in the
+			// UI, so without this every match was scored across all 5 regional databases with no
+			// preference — the shortest/sparsest name often won regardless of region (see matchIngredient's
+			// REGION_MATCH_BONUS), which is how "pasta, cooked" could land on a Canadian corn-pasta entry.
+			const match = matchIngredient(line.matchName, 'US');
 			const entry = match?.entry ?? null;
 
 			let aiProfile: NutrientProfile | null = null;
 			let matchConfidence: MatchConfidence | 'none' | 'ai-estimated' = match?.confidence ?? 'none';
 			if (!entry && ai && !line.isOptionalOrToTaste && aiCallsRemaining > 0) {
 				aiCallsRemaining--;
-				aiProfile = await estimateNutritionWithAI(line.ingredientName, ai);
+				aiProfile = await estimateNutritionWithAI(line.matchName, ai);
 				if (aiProfile) matchConfidence = 'ai-estimated';
 			}
 

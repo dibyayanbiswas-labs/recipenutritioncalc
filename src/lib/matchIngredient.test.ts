@@ -48,3 +48,29 @@ describe('matchIngredient — regional terminology', () => {
 		expect(matchIngredient('capsicum')).not.toBeNull();
 	});
 });
+
+describe('matchIngredient — regression: bare-word and off-type mismatches', () => {
+	it('a bare "pepper" query means black pepper (the spice), not a bell/chili pepper (the vegetable)', () => {
+		const m = matchIngredient('pepper', 'US');
+		expect(m?.entry.name.toLowerCase()).toContain('pepper');
+		expect(m?.entry.name.toLowerCase()).toContain('black');
+		expect(m?.entry.name.toLowerCase()).not.toContain('jalapeno');
+	});
+
+	it('an explicit variety query still wins over the bare-pepper default', () => {
+		const m = matchIngredient('jalapeno pepper', 'US');
+		expect(m?.entry.name.toLowerCase()).toContain('jalapeno');
+	});
+
+	it('"vegetable oil" resolves to a neutral cooking oil, not an extreme-satFat tropical oil', () => {
+		const m = matchIngredient('vegetable oil', 'US');
+		expect(m).not.toBeNull();
+		expect(m!.entry.per100g.satFat_g).toBeLessThan(20);
+	});
+
+	it('"french fries" matches an actual fries entry, not "French toast"', () => {
+		const m = matchIngredient('frozen french fries', 'US');
+		expect(m?.entry.name.toLowerCase()).not.toContain('toast');
+		expect(m?.entry.name.toLowerCase()).toContain('french fried');
+	});
+});

@@ -6,6 +6,10 @@ export interface ParsedIngredientLine {
 	quantityRange: [number, number] | null;
 	unit: string | null;
 	ingredientName: string;
+	/** `ingredientName` plus any trailing descriptor words (e.g. "drained and rinsed", "cooked") that
+	 * change which nutrition-database entry is correct — use this, not `ingredientName`, for food
+	 * matching/AI-estimate lookups. `ingredientName` alone stays the clean display form. */
+	matchName: string;
 	notes: string | null;
 	isOptionalOrToTaste: boolean;
 }
@@ -238,6 +242,15 @@ const PREP_ADVERBS = ['finely', 'coarsely', 'roughly', 'thinly', 'thickly', 'fre
 const PREP_WORD_PATTERN = `(?:(?:${PREP_ADVERBS.join('|')})\\s+)?(?:${PREP_WORDS.join('|')})`;
 const LEADING_PREP = new RegExp(`^${PREP_WORD_PATTERN}\\b\\s*`, 'i');
 const TRAILING_PREP = new RegExp(`\\s+${PREP_WORD_PATTERN}$`, 'i');
+const CUT_PREP_STRIP_PATTERN = new RegExp(`\\b${PREP_WORD_PATTERN}\\b`, 'gi');
+
+/** Strips pure cut/texture instructions (chopped, diced, softened, ...) anywhere in the text, leaving
+ * everything else — including state/processing words like "canned", "cooked", "drained", "rinsed",
+ * "frozen" — intact. Those words are noise for a display name but matter for picking the right
+ * nutrition-database entry, so they're kept when building a food-matching query. */
+function stripCutPrepWords(text: string): string {
+	return text.replace(CUT_PREP_STRIP_PATTERN, ' ').replace(/\s+/g, ' ').trim();
+}
 
 /** Strips a leading or trailing preparation word not already caught by a comma clause,
  * e.g. "chopped tomatoes" -> "tomatoes" (+"chopped" as a note), so it doesn't hurt food matching. */
@@ -255,7 +268,7 @@ function extractPreparationWord(text: string): { text: string; prep: string | nu
 	return { text, prep: null };
 }
 
-function extractNotes(text: string): { text: string; notes: string | null } {
+function extractNotes(text: string): { text: string; notes: string | null; matchExtra: string } {
 	const notes: string[] = [];
 	const withoutParens = text.replace(/\(([^)]*)\)/g, (_m, inner) => {
 		notes.push(inner.trim());
@@ -264,17 +277,26 @@ function extractNotes(text: string): { text: string; notes: string | null } {
 	// Trailing comma clause, e.g. "chicken breast, diced"
 	const commaMatch = withoutParens.match(/^([^,]+),\s*(.+)$/);
 	let name = withoutParens;
+	let commaClause = '';
 	if (commaMatch) {
 		name = commaMatch[1];
-		notes.push(commaMatch[2].trim());
+		commaClause = commaMatch[2].trim();
+		notes.push(commaClause);
 	}
 
 	const { text: nameWithoutPrep, prep } = extractPreparationWord(name.replace(/\s+/g, ' ').trim());
 	if (prep) notes.push(prep);
 
+	// The comma clause often carries the food's actual prep/processing state — "chickpeas, drained and
+	// rinsed" must match a canned/drained entry, not dried chickpeas; "chicken, cooked, shredded" must
+	// match cooked chicken, not raw. Only the cut/texture words are noise for matching, so those are
+	// the only thing stripped before it's kept for the match query.
+	const matchExtra = commaClause ? stripCutPrepWords(commaClause) : '';
+
 	return {
 		text: nameWithoutPrep,
 		notes: notes.length > 0 ? notes.join(', ') : null,
+		matchExtra,
 	};
 }
 
@@ -295,6 +317,24 @@ function isSectionHeadingLine(line: string): boolean {
 	if (SECTION_HEADING_KEYWORDS.test(trimmed)) return true;
 	const letters = trimmed.replace(/[^a-zA-Z]/g, '');
 	return letters.length >= 3 && trimmed === trimmed.toUpperCase();
+}
+
+// Matches a bare "salt and/& pepper" line (with optional descriptors on either side and an optional
+// trailing "to taste"-style phrase), e.g. "Salt & black pepper", "kosher salt and freshly ground black
+// pepper", "Salt and pepper to taste". Scoped to lines with no digit at all (see the caller) — a
+// recipe never writes this idiom with a shared amount, so it's always meant as two separate seasonings.
+const SALT_AND_PEPPER_IDIOM = /^((?:[a-z]+\s+)*salt)\s*(?:and|&)\s*((?:[a-z]+\s+)*pepper)([\s,]*(?:to taste|as needed|as desired))?\s*$/i;
+
+/** Splits the "salt and pepper" idiom into two independent ingredient lines. Without this, the whole
+ * phrase is looked up as a single food and — because a composite USDA dish entry that happens to
+ * contain both literal words ("Peppers, sweet, green, cooked, boiled, drained, with salt") scores a
+ * perfect coverage match — it wins over either actual seasoning, silently substituting a vegetable
+ * side dish for what's actually just salt and pepper. */
+function splitSaltAndPepperIdiom(line: string): string[] {
+	const match = line.match(SALT_AND_PEPPER_IDIOM);
+	if (!match) return [line];
+	const suffix = match[3] ? ` ${match[3].replace(/^[\s,]+/, '')}` : '';
+	return [`${match[1]}${suffix}`, `${match[2]}${suffix}`];
 }
 
 /** Fallback for a whole ingredient list pasted as one comma-separated line instead of one per line,
@@ -329,6 +369,9 @@ export function splitIntoLines(text: string): string[] {
 		.map((l) => l.replace(/[,;]+\s*$/, '').trim()) // trailing "2 cups oats," -> "2 cups oats"
 		.filter((l) => l.length > 0)
 		.filter((l) => !isSectionHeadingLine(l))
+		// Digit-free guard: a line with an explicit shared amount ("1 tsp salt and pepper") doesn't
+		// unambiguously split into two amounts, so it's left alone rather than guessed at.
+		.flatMap((l) => (/\d/.test(l) ? [l] : splitSaltAndPepperIdiom(l)))
 		.flatMap((l) => splitCommaSeparatedIngredients(l));
 }
 
@@ -380,19 +423,25 @@ export function parseIngredientLine(raw: string): ParsedIngredientLine {
 		working = working.trim();
 	}
 
-	const { text: leftoverName, notes: leftoverNotes } = extractNotes(working);
+	const { text: leftoverName, notes: leftoverNotes, matchExtra: leftoverMatchExtra } = extractNotes(working);
 
 	// When the food name came from before a "name — amount" separator, anything left over after
 	// pulling the amount out of the right-hand side (e.g. "medium" from "1 medium (150 g)") is a
 	// descriptor, not the name — it goes into notes instead of overwriting the real name.
 	let ingredientName: string;
 	let notes: string | null;
+	let matchExtra: string;
 	if (nameFirst) {
 		ingredientName = nameFirst;
 		notes = [leftoverName, leftoverNotes].filter((s) => s && s.length > 0).join(', ') || null;
+		// Neither piece is part of the food's identity here (that's already `nameFirst`) — both are
+		// pure descriptors, so both can carry a prep/processing state relevant to matching, e.g.
+		// "Chickpeas: 1/2 cup drained and rinsed" puts "drained and rinsed" in `leftoverName` itself.
+		matchExtra = [stripCutPrepWords(leftoverName), leftoverMatchExtra].filter((s) => s && s.length > 0).join(' ');
 	} else {
 		ingredientName = leftoverName || working.trim();
 		notes = leftoverNotes;
+		matchExtra = leftoverMatchExtra;
 	}
 
 	if (weightOverride) {
@@ -411,12 +460,15 @@ export function parseIngredientLine(raw: string): ParsedIngredientLine {
 		notes = [notes, `or ${orMatch[2].trim()}`].filter((s) => s && s.length > 0).join(', ') || null;
 	}
 
+	const matchName = [ingredientName, matchExtra].filter((s) => s && s.length > 0).join(' ').trim();
+
 	return {
 		raw,
 		quantity,
 		quantityRange,
 		unit,
 		ingredientName,
+		matchName: matchName || ingredientName,
 		notes,
 		isOptionalOrToTaste,
 	};

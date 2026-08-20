@@ -404,3 +404,29 @@ describe('parseIngredientLine — "X or Y" alternative naming', () => {
 		expect(r.notes).toContain('or almond milk');
 	});
 });
+
+describe('splitIntoLines — "salt and pepper" idiom', () => {
+	// Regression coverage for a real bug: the combined phrase, looked up as one food, was matching a
+	// USDA composite dish ("Peppers, sweet, green, cooked, boiled, drained, with salt") that happens to
+	// contain both literal words — substituting a vegetable side dish for what's actually two plain
+	// seasonings. Splitting it into two lines before matching sidesteps that entirely.
+	it('splits "Salt & black pepper" into two separate lines', () => {
+		expect(splitIntoLines('Salt & black pepper')).toEqual(['Salt', 'black pepper']);
+	});
+
+	it('splits "Salt and pepper to taste", keeping "to taste" on both halves', () => {
+		expect(splitIntoLines('Salt and pepper to taste')).toEqual(['Salt to taste', 'pepper to taste']);
+	});
+
+	it('each half parses as its own optional, zero-quantity ingredient', () => {
+		const [salt, pepper] = parseIngredients('Salt and pepper to taste');
+		expect(salt.ingredientName).toBe('Salt');
+		expect(salt.isOptionalOrToTaste).toBe(true);
+		expect(pepper.ingredientName).toBe('pepper');
+		expect(pepper.isOptionalOrToTaste).toBe(true);
+	});
+
+	it('does NOT split when a shared amount is given (no digit-free guarantee)', () => {
+		expect(splitIntoLines('1 tsp salt and pepper')).toEqual(['1 tsp salt and pepper']);
+	});
+});

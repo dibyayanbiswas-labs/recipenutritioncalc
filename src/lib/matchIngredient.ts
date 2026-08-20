@@ -102,10 +102,41 @@ const COOKED_STATE_WORDS = new Set([
 	'microwaved',
 ]);
 
+// The "-ies" -> "-y" rule below assumes the singular ends in a consonant + "y" (berry/berries,
+// curry/curries) — wrong for a word that already ends in "i" (chili/chilies, chilli/chillies),
+// where it produces a bogus "chily"/"chilli" mismatch. "green chilies" was matching "beet greens"
+// for exactly this reason: "chilies" stemmed to a token nothing in the database has.
+// "fries" (the noun, as in "french fries") stems to "fry" under the regular '-ies'->'-y' rule, but
+// every matching entry in the source data spells it "french fried" (adjective) — "fried" is also a
+// COOKED_STATE_WORDS literal, so this maps to that exact string rather than to "fry", keeping the
+// existing cooked-word handling intact instead of introducing a third, disconnected token spelling.
+const STEM_EXCEPTIONS: Record<string, string> = {
+	chilies: 'chili',
+	chillies: 'chilli',
+	fries: 'fried',
+};
+
+// A word ending in "-es" is ambiguous about how much to strip: most of the time the singular already
+// ends in a silent "e" and the plural is just "+s" (cube/cubes, sauce/sauces, cheese/cheeses,
+// apple/apples) — stripping only the trailing "s" recovers it. Only strip the full "es" for the
+// genuine sibilant-plural pattern, where the singular has no trailing "e" at all: box/boxes,
+// church/churches, dish/dishes, kiss/kisses, buzz/buzzes (all needing a doubled consonant or x/ch/sh
+// immediately before "es" — that doubling is what distinguishes "kisses" from "houses"/"cheeses"), or
+// a consonant + "o" (tomato/tomatoes, potato/potatoes). Blindly always stripping "es" (the previous
+// behavior) silently turned "cubes" into "cub" and "apples" into "appl" — tokens nothing in the
+// database has, since entries are tokenized the same way and mostly don't happen to collide on the
+// wrong stem too.
+const HARD_ES_ENDING = /(?:ches|shes|xes|zzes|sses)$/;
+const CONSONANT_O_ES_ENDING = /[^aeiou]oes$/;
+
 /** Very light suffix stemming so "sugars"/"tomatoes"/"onions" match their singular query forms. */
 function stem(word: string): string {
+	if (STEM_EXCEPTIONS[word]) return STEM_EXCEPTIONS[word];
 	if (word.length > 4 && word.endsWith('ies')) return word.slice(0, -3) + 'y';
-	if (word.length > 4 && word.endsWith('es')) return word.slice(0, -2);
+	if (word.length > 4 && word.endsWith('es')) {
+		if (HARD_ES_ENDING.test(word) || CONSONANT_O_ES_ENDING.test(word)) return word.slice(0, -2);
+		return word.slice(0, -1);
+	}
 	if (word.length > 3 && word.endsWith('s') && !word.endsWith('ss')) return word.slice(0, -1);
 	return word;
 }
@@ -148,6 +179,15 @@ const UNCOMMON_VARIANT_WORDS = new Set([
 	// because its qualifier chain happens to be shorter than the everyday white/standard version.
 	'turkey', // e.g. "bacon"/"sausage" defaulting to the turkey variant instead of the everyday
 	// (usually pork) one — same species-substitute problem as sheep/goat milk above.
+	// A bare "oil"/"vegetable oil" query means the everyday neutral cooking oil (canola/soybean,
+	// ~7-15g satFat/100g), not one of these extreme-satFat tropical oils (palm ~49g, palm kernel
+	// ~81.5g, coconut ~86.5g/100g) — but "vegetable oil, palm kernel" was winning anyway: its literal
+	// "vegetable oil" prefix gives it full query coverage plus the region-match bonus, while the
+	// correct plain "oil, vegetable, soybean, refined"-style entry has to compete on the same terms.
+	// Demoted only when the query doesn't explicitly ask for that variant, same as sheep/goat milk.
+	'palm',
+	'kernel',
+	'coconut',
 ]);
 // A recipe naming a plain ingredient almost always means its everyday fresh/liquid form, not a
 // shelf-stable processed variant — penalized only when the query doesn't ask for that form.
@@ -165,12 +205,26 @@ const PROCESSED_FORM_WORDS = new Set([
 	'flavoured',
 	'flavored',
 ]);
+// A recipe volume like "500ml beef stock" means the diluted, ready-to-use liquid, but a cube/granules
+// entry is a concentrate meant to be DISSOLVED into that much liquid — scaling it as if it were the
+// liquid itself overstates sodium by roughly the dilution factor (~30-40x for a bouillon cube). This
+// needs a much larger penalty than PROCESSED_FORM_WORDS: a cube entry is often the ONLY same-food
+// entry that contains every query word verbatim ("beef" + "stock"), so it wins on coverage alone even
+// with the standard penalty applied — the concentration error here is an order of magnitude worse than
+// a typical dried-vs-fresh gap, so it needs to be knocked out of contention outright, not just nudged.
+const CONCENTRATE_WORDS = new Set(['cube', 'granules']);
+const CONCENTRATE_PENALTY = 0.6;
 // A short, specific named dish/product (e.g. "Spanish rice", "duchesse potatoes") can otherwise
 // out-rank the plain everyday ingredient purely because it has fewer qualifier tokens to be
 // penalized for, even though it's a completely different food (different prep, added ingredients,
 // often much higher sodium/fat) — not a description of the plain ingredient. Penalized only when
 // the query itself doesn't ask for that specific dish.
-const NAMED_DISH_WORDS = new Set(['spanish', 'duchesse']);
+// 'toast' added because "french fries" ("fry"-stemmed) shares its "french" token with "French toast,
+// frozen, ready-to-heat" — an unrelated breakfast bread — which then out-ranked every actual fries
+// entry: those are all named "Potatoes, french fried, ..." in the source data (potato as the head
+// noun, so they get no primary-segment bonus for a "french fries" query at all), so "french toast"'s
+// primary-segment credit for sharing "french" was otherwise enough to win outright.
+const NAMED_DISH_WORDS = new Set(['spanish', 'duchesse', 'toast']);
 
 // --- Inverted index, built once per Worker isolate (amortized across requests, not per-request cost) ---
 // Scoring always happens against an entry's full canonical NAME (never a short alias) — a short
@@ -190,13 +244,27 @@ const entryNameTokens: Set<string>[] = entryNameTokensOrdered.map((t) => new Set
 // 'grains' added for CNF (Canadian Nutrient File), which consistently uses the same category-prefix
 // convention for its staple grain entries (e.g. "Grains, wheat flour, white, all purpose, bleached";
 // "Grains, rice, brown, medium-grain, dry") — verified against the bundled CNF data.
-const CATEGORY_PREFIX_DENYLIST = new Set(['spices', 'nuts', 'seeds', 'grains']);
+// 'fish', 'game meat', 'crustaceans', 'mollusks' added after auditing USDA's own convention for those
+// groups — e.g. "Fish, salmon, atlantic, wild, cooked, dry heat", "Crustaceans, shrimp, farm raised,
+// raw" — where the actual food a recipe names ("salmon", "shrimp") is always segment 2, same as spices.
+// 'soup' added for the same reason (400+ entries: "Soup, stock, beef, home-prepared", "Soup, black
+// bean, canned, condensed") — without it, a query like "beef stock" got ZERO identity-match bonus for
+// the one entry that's actually a beef stock, since its segment 1 is "soup" not "beef"/"stock", while
+// unrelated raw beef cuts (segment 1 genuinely "beef") won the full bonus purely for starting with the
+// right word — enough to outrank the correct stock entry even after penalizing off-type words.
+const CATEGORY_PREFIX_DENYLIST = new Set(['spices', 'nuts', 'seeds', 'grains', 'fish', 'game meat', 'crustaceans', 'mollusks', 'soup']);
 const entryPrimaryTokens: Set<string>[] = INGREDIENTS.map((e) => {
 	const segments = e.name.split(',');
+	// Lowercased before the denylist check: only the US (USDA) source consistently lowercases these
+	// category prefixes ("spices, cinnamon, ground") — UK/AU/CA/IN entries capitalize them ("Spices,
+	// cinnamon, ground"), so a case-sensitive check silently never matched for 4 of the 5 regions.
 	const first = segments[0].trim();
-	if (segments.length > 1 && CATEGORY_PREFIX_DENYLIST.has(first)) return tokenize(segments[1]);
+	if (segments.length > 1 && CATEGORY_PREFIX_DENYLIST.has(first.toLowerCase())) return tokenize(segments[1]);
 	return tokenize(first);
 });
+// Precomputed per-entry lowercased first segment — used for the bare-"pepper" tiebreak below.
+const entryPrimaryCategory: string[] = INGREDIENTS.map((e) => e.name.split(',')[0].trim().toLowerCase());
+const BARE_PEPPER_SPICE_BONUS = 0.3;
 const invertedIndex = new Map<string, number[]>(); // token -> entry indices
 
 for (let entryIndex = 0; entryIndex < INGREDIENTS.length; entryIndex++) {
@@ -271,12 +339,21 @@ export function matchIngredient(name: string, region?: RegionCode): IngredientMa
 		const hasUncommonVariantWord = [...nameTokens].some((t) => UNCOMMON_VARIANT_WORDS.has(t));
 		const hasProcessedFormWord = [...nameTokens].some((t) => PROCESSED_FORM_WORDS.has(t));
 		const hasNamedDishWord = [...nameTokens].some((t) => NAMED_DISH_WORDS.has(t));
+		const hasConcentrateWord = [...nameTokens].some((t) => CONCENTRATE_WORDS.has(t));
+		const queryHasConcentrateWord = [...queryTokens].some((t) => CONCENTRATE_WORDS.has(t));
+		// Unlike "black rice" (genuinely uncommon — 'black' is rightly demoted for a plain "rice"
+		// query), "black pepper" IS the plain, default sense of a bare "pepper" query — so the general
+		// black-variant demotion below would otherwise fight the bare-pepper spice tiebreak just above,
+		// leaving "spices, pepper, white" to win over "spices, pepper, black" for no good reason.
+		const isBarePepperBlackException =
+			queryTokens.size === 1 && queryTokens.has('pepper') && nameTokens.has('black') && entryPrimaryCategory[entryIndex] === 'spices';
 
 		const isOffType =
 			(hasCookedWord && !queryHasCookedWord) ||
-			(hasUncommonVariantWord && ![...queryTokens].some((t) => UNCOMMON_VARIANT_WORDS.has(t))) ||
+			(hasUncommonVariantWord && !isBarePepperBlackException && ![...queryTokens].some((t) => UNCOMMON_VARIANT_WORDS.has(t))) ||
 			(hasProcessedFormWord && ![...queryTokens].some((t) => PROCESSED_FORM_WORDS.has(t))) ||
-			(hasNamedDishWord && ![...queryTokens].some((t) => NAMED_DISH_WORDS.has(t)));
+			(hasNamedDishWord && ![...queryTokens].some((t) => NAMED_DISH_WORDS.has(t))) ||
+			(hasConcentrateWord && !queryHasConcentrateWord);
 
 		const primaryTokens = entryPrimaryTokens[entryIndex];
 		let primaryIntersection = 0;
@@ -300,8 +377,15 @@ export function matchIngredient(name: string, region?: RegionCode): IngredientMa
 		let rankScore =
 			coverage - EXTRA_TOKEN_PENALTY * Math.sqrt(extraTokens) + PRIMARY_MATCH_BONUS * primaryPrecision + positionBonus;
 		if (hasCookedWord && !queryHasCookedWord) rankScore -= 0.05;
+		// Rewards an entry for being in *some* cooked state whenever the query names one too, even when
+		// the exact words differ (query "sauteed"/"grilled"/"roasted" vs. an entry that literally says
+		// "cooked") — without this, a cooked-state query gets no credit for matching cooked entries at
+		// all, so a bare/plain entry with fewer qualifier words can out-rank the correctly-prepared one
+		// purely on token count (e.g. "mushrooms sauteed" landing on "mushroom, oyster" instead of any
+		// actually-cooked mushroom entry).
+		if (hasCookedWord && queryHasCookedWord) rankScore += 0.1;
 		if (hasRawWord) rankScore += 0.02;
-		if (hasUncommonVariantWord && ![...queryTokens].some((t) => UNCOMMON_VARIANT_WORDS.has(t))) {
+		if (hasUncommonVariantWord && !isBarePepperBlackException && ![...queryTokens].some((t) => UNCOMMON_VARIANT_WORDS.has(t))) {
 			rankScore -= UNCOMMON_VARIANT_PENALTY;
 		}
 		if (hasProcessedFormWord && ![...queryTokens].some((t) => PROCESSED_FORM_WORDS.has(t))) {
@@ -309,6 +393,19 @@ export function matchIngredient(name: string, region?: RegionCode): IngredientMa
 		}
 		if (hasNamedDishWord && ![...queryTokens].some((t) => NAMED_DISH_WORDS.has(t))) {
 			rankScore -= UNCOMMON_VARIANT_PENALTY;
+		}
+		// A bare, single-word "pepper" query — the common case after "salt and pepper" is split into
+		// its two ingredients — is a well-known culinary default for black pepper (the spice), not a
+		// bell/chili/jalapeno pepper (the vegetable). Both interpretations otherwise score identically
+		// (perfect coverage either way), so without an explicit tiebreak "peppers, jalapeno, raw" won
+		// purely because "peppers" alone as its primary segment gave it a full primary-match bonus,
+		// while "spices, pepper, black"'s primary segment is "pepper, black" — only half-matched since
+		// a bare query never says "black" either.
+		if (queryTokens.size === 1 && queryTokens.has('pepper') && entryPrimaryCategory[entryIndex] === 'spices') {
+			rankScore += BARE_PEPPER_SPICE_BONUS;
+		}
+		if (hasConcentrateWord && !queryHasConcentrateWord) {
+			rankScore -= CONCENTRATE_PENALTY;
 		}
 		if (region && INGREDIENTS[entryIndex].region === region) {
 			rankScore += REGION_MATCH_BONUS;

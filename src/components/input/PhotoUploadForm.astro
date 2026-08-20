@@ -4,22 +4,17 @@ import Button from '../ui/Button.astro';
 
 <form id="photo-form" class="space-y-md">
 	<div>
-		<div class="flex items-center gap-xs mb-xxs">
-			<label for="photo-input" class="text-body-sm-strong text-ink">Upload a photo of the recipe</label>
-			<button
-				type="button"
-				id="photo-format-info-toggle"
-				aria-expanded="false"
-				aria-controls="photo-format-info-panel"
-				aria-label="Photo help"
-				class="shrink-0 h-5 w-5 rounded-full bg-black text-white hover:opacity-80 text-caption flex items-center justify-center"
-			>
-				i
-			</button>
-		</div>
-		<p class="text-caption text-warning-deep font-medium mb-xxs">
-			Photograph the ingredient list itself, in focus and well-lit — not a photo of the finished dish.
-		</p>
+		<label for="photo-input" class="text-body-sm-strong text-ink block mb-xxs">Upload a photo of the recipe</label>
+		<button
+			type="button"
+			id="photo-format-info-toggle"
+			aria-expanded="false"
+			aria-controls="photo-format-info-panel"
+			class="flex items-center gap-xxs text-left text-caption text-mute mb-sm"
+		>
+			<span>Photograph the ingredient list itself, in focus and well-lit — not a photo of the finished dish.</span>
+			<span class="text-link underline shrink-0">See examples</span>
+		</button>
 		<div
 			id="photo-format-info-panel"
 			role="note"

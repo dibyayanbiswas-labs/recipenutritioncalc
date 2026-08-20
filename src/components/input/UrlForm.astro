@@ -14,22 +14,17 @@ const { error = null, servingsError = null, value = '' } = Astro.props;
 
 <form method="POST" action={actions.analyzeUrl} class="space-y-md">
 	<div>
-		<div class="flex items-center gap-xs mb-xxs">
-			<label for="recipe-url" class="text-body-sm-strong text-ink">Recipe URL</label>
-			<button
-				type="button"
-				id="url-format-info-toggle"
-				aria-expanded="false"
-				aria-controls="url-format-info-panel"
-				aria-label="URL help"
-				class="shrink-0 h-5 w-5 rounded-full bg-black text-white hover:opacity-80 text-caption flex items-center justify-center"
-			>
-				i
-			</button>
-		</div>
-		<p class="text-caption text-warning-deep font-medium mb-xxs">
-			Link straight to the recipe page itself — not the site's homepage or a search results page.
-		</p>
+		<label for="recipe-url" class="text-body-sm-strong text-ink block mb-xxs">Recipe URL</label>
+		<button
+			type="button"
+			id="url-format-info-toggle"
+			aria-expanded="false"
+			aria-controls="url-format-info-panel"
+			class="flex items-center gap-xxs text-left text-caption text-mute mb-sm"
+		>
+			<span>Link straight to the recipe page itself — not the site's homepage or a search results page.</span>
+			<span class="text-link underline shrink-0">See examples</span>
+		</button>
 		<div
 			id="url-format-info-panel"
 			role="note"

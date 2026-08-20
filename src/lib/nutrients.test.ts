@@ -81,4 +81,19 @@ describe('recipe text -> nutrition pipeline', () => {
 			expect(r.grams).toBeGreaterThan(0);
 		}
 	});
+
+	it('gives a bare, unquantified seasoning line a pinch-sized weight, not a whole-produce-item guess', async () => {
+		// Regression: "Salt & black pepper" (no amount given) used to fall back to
+		// GENERIC_COUNT_WEIGHT_G (100g — sized for "1 onion"), silently adding a whole 100g of ground
+		// pepper's fiber/protein/sodium/fat to the recipe.
+		const [salt, pepper] = await analyze('Salt & black pepper');
+		expect(salt.grams).toBeLessThan(5);
+		expect(pepper.grams).toBeLessThan(5);
+	});
+
+	it('resolves "1 can X" to a standard can size (~400g), not a generic 100g produce-item guess', async () => {
+		const [result] = await analyze('1 can black beans');
+		expect(result.grams).toBeGreaterThanOrEqual(350);
+		expect(result.grams).toBeLessThanOrEqual(450);
+	});
 });

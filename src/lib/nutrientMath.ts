@@ -50,6 +50,32 @@ export function computeDailyValuePercent(perServing: NutrientProfile): Record<st
 	return dailyValuePercent;
 }
 
+// Graduated %DV bands rather than one all-or-nothing cutoff, so the score can move smoothly across
+// its full range instead of being capped. The bands extend the FDA Nutrition Facts convention that
+// <=5% DV is "low" and >=20% DV is "high" (21 CFR 101.9) with two extra steps on each side, the same
+// banding technique Nutri-Score uses for its own negative/positive points — so a recipe that's
+// genuinely low across sugar/sodium/sat-fat AND rich in fiber/protein can actually reach 9-10, and one
+// that's extreme on a bad nutrient can actually reach 1-2, instead of every recipe being squeezed into
+// a 4-7 band by a formula that only ever moves by 1 point in each direction.
+const BAD_NUTRIENT_BANDS: { maxDV: number; penalty: number }[] = [
+	{ maxDV: 5, penalty: 0 },
+	{ maxDV: 10, penalty: 1 },
+	{ maxDV: 20, penalty: 2 },
+	{ maxDV: 35, penalty: 3 },
+	{ maxDV: Infinity, penalty: 4 },
+];
+const GOOD_NUTRIENT_BANDS: { maxDV: number; bonus: number }[] = [
+	{ maxDV: 5, bonus: 0 },
+	{ maxDV: 10, bonus: 1 },
+	{ maxDV: 20, bonus: 2 },
+	{ maxDV: 35, bonus: 3 },
+	{ maxDV: Infinity, bonus: 4 },
+];
+
+function bandFor<T extends { maxDV: number }>(dv: number, bands: T[]): T {
+	return bands.find((b) => dv <= b.maxDV) ?? bands[bands.length - 1];
+}
+
 export function computeHealthScore(perServing: NutrientProfile): HealthScore {
 	let score = 5;
 	const rationale: string[] = [];
@@ -60,25 +86,30 @@ export function computeHealthScore(perServing: NutrientProfile): HealthScore {
 	const fiberDV = ((perServing.fiber_g ?? 0) / DAILY_VALUES.fiber_g) * 100;
 	const proteinDV = ((perServing.protein_g ?? 0) / DAILY_VALUES.protein_g) * 100;
 
-	if (sugarDV > 20) {
-		score -= 1;
-		rationale.push('High added/total sugar per serving');
+	const sugarPenalty = bandFor(sugarDV, BAD_NUTRIENT_BANDS).penalty;
+	if (sugarPenalty > 0) {
+		score -= sugarPenalty;
+		rationale.push(sugarPenalty >= 3 ? 'Very high added/total sugar per serving' : 'High added/total sugar per serving');
 	}
-	if (sodiumDV > 20) {
-		score -= 1;
-		rationale.push('High sodium per serving');
+	const sodiumPenalty = bandFor(sodiumDV, BAD_NUTRIENT_BANDS).penalty;
+	if (sodiumPenalty > 0) {
+		score -= sodiumPenalty;
+		rationale.push(sodiumPenalty >= 3 ? 'Very high sodium per serving' : 'High sodium per serving');
 	}
-	if (satFatDV > 20) {
-		score -= 1;
-		rationale.push('High saturated fat per serving');
+	const satFatPenalty = bandFor(satFatDV, BAD_NUTRIENT_BANDS).penalty;
+	if (satFatPenalty > 0) {
+		score -= satFatPenalty;
+		rationale.push(satFatPenalty >= 3 ? 'Very high saturated fat per serving' : 'High saturated fat per serving');
 	}
-	if (fiberDV > 15) {
-		score += 1;
-		rationale.push('Good source of fiber');
+	const fiberBonus = bandFor(fiberDV, GOOD_NUTRIENT_BANDS).bonus;
+	if (fiberBonus > 0) {
+		score += fiberBonus;
+		rationale.push(fiberBonus >= 3 ? 'Excellent source of fiber' : 'Good source of fiber');
 	}
-	if (proteinDV > 20) {
-		score += 1;
-		rationale.push('Good source of protein');
+	const proteinBonus = bandFor(proteinDV, GOOD_NUTRIENT_BANDS).bonus;
+	if (proteinBonus > 0) {
+		score += proteinBonus;
+		rationale.push(proteinBonus >= 3 ? 'Excellent source of protein' : 'Good source of protein');
 	}
 
 	score = Math.max(1, Math.min(10, Math.round(score * 10) / 10));

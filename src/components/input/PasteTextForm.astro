@@ -44,22 +44,17 @@ const EXAMPLE_PLACEHOLDER = '1 lb chicken breast\n2 cups all-purpose flour\n1 ts
 	</div>
 
 	<div id="paste-text-mode">
-		<div class="flex items-center gap-xs mb-xxs">
-			<label for="ingredient-textarea" class="text-body-sm-strong text-ink">Paste your ingredients (one per line)</label>
-			<button
-				type="button"
-				id="format-info-toggle"
-				aria-expanded="false"
-				aria-controls="format-info-panel"
-				aria-label="Format help"
-				class="shrink-0 h-5 w-5 rounded-full bg-black text-white hover:opacity-80 text-caption flex items-center justify-center"
-			>
-				i
-			</button>
-		</div>
-		<p class="text-caption text-warning-deep font-medium mb-xxs">
-			One ingredient per line — e.g. <span class="font-mono">2 cups basmati rice</span>.
-		</p>
+		<label for="ingredient-textarea" class="text-body-sm-strong text-ink block mb-xxs">Paste your ingredients (one per line)</label>
+		<button
+			type="button"
+			id="format-info-toggle"
+			aria-expanded="false"
+			aria-controls="format-info-panel"
+			class="flex items-center gap-xxs text-left text-caption text-mute mb-sm"
+		>
+			<span>One ingredient per line — e.g. <span class="font-mono">2 cups basmati rice</span>.</span>
+			<span class="text-link underline shrink-0">See examples</span>
+		</button>
 		<div
 			id="format-info-panel"
 			role="note"
@@ -104,17 +99,11 @@ const EXAMPLE_PLACEHOLDER = '1 lb chicken breast\n2 cups all-purpose flour\n1 ts
 	const infoToggle = document.getElementById('format-info-toggle');
 	const infoPanel = document.getElementById('format-info-panel');
 
-	function openInfoPanel() {
-		infoPanel?.classList.remove('hidden');
-		infoToggle?.setAttribute('aria-expanded', 'true');
-	}
 	infoToggle?.addEventListener('click', () => {
 		const isOpen = !infoPanel?.classList.contains('hidden');
 		infoPanel?.classList.toggle('hidden', isOpen);
 		infoToggle?.setAttribute('aria-expanded', String(!isOpen));
 	});
-	// Reminded every time, not just once: the info panel opens on every focus of the textarea.
-	textarea?.addEventListener('focus', openInfoPanel);
 
 	document.getElementById('paste-start-over')?.addEventListener('click', () => {
 		if (textarea) textarea.value = '';
