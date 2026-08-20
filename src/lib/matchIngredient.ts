@@ -274,7 +274,14 @@ const entryNameTokens: Set<string>[] = entryNameTokensOrdered.map((t) => new Set
 // the one entry that's actually a beef stock, since its segment 1 is "soup" not "beef"/"stock", while
 // unrelated raw beef cuts (segment 1 genuinely "beef") won the full bonus purely for starting with the
 // right word — enough to outrank the correct stock entry even after penalizing off-type words.
-const CATEGORY_PREFIX_DENYLIST = new Set(['spices', 'nuts', 'seeds', 'grains', 'fish', 'game meat', 'crustaceans', 'mollusks', 'soup']);
+// 'sauce' added for the same reason (140+ entries across regions: "Sauce, peanut, made from peanut
+// butter, water, soy sauce"; "Sauce, barbecue, commercial"; "Sauce, teriyaki, ready-to-serve") — without
+// it, a plain "soy sauce" query landed on "Sauce, peanut, ..." instead of any of the six real soy-sauce
+// entries: that entry's segment 1 is just "sauce" (1 token, 100% primary-match precision against a query
+// containing "sauce"), while the correct soy-sauce entries have no comma at all, so their whole 6-token
+// name counts as the primary segment and only gets partial credit — enough for a nutritionally unrelated
+// peanut sauce to outrank actual soy sauce.
+const CATEGORY_PREFIX_DENYLIST = new Set(['spices', 'nuts', 'seeds', 'grains', 'fish', 'game meat', 'crustaceans', 'mollusks', 'soup', 'sauce']);
 const entryPrimaryTokens: Set<string>[] = INGREDIENTS.map((e) => {
 	const segments = e.name.split(',');
 	// Lowercased before the denylist check: only the US (USDA) source consistently lowercases these

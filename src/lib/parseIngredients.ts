@@ -376,6 +376,94 @@ function isSectionHeadingLine(line: string): boolean {
 	return letters.length >= 3 && trimmed === trimmed.toUpperCase();
 }
 
+// A pasted recipe blog often carries a leading headnote or embedded step ("Preheat your oven to
+// 350°F.", "In a large bowl, combine the dry ingredients.") above or between the real ingredient
+// lines. Unlike a section heading, these often contain a digit (an oven temperature, a time), so
+// isSectionHeadingLine's digit-free guard doesn't catch them — left alone, such a line has no
+// leading amount, gets treated as its own "ingredient", and silently becomes a phantom AI-estimated
+// line with a fabricated ~100g/0kcal profile folded into the recipe's totals.
+const INSTRUCTION_LEADING_VERBS = new Set([
+	'preheat',
+	'bake',
+	'mix',
+	'combine',
+	'whisk',
+	'stir',
+	'pour',
+	'heat',
+	'cook',
+	'let',
+	'cover',
+	'remove',
+	'serve',
+	'garnish',
+	'season',
+	'place',
+	'transfer',
+	'line',
+	'grease',
+	'fold',
+	'beat',
+	'chill',
+	'refrigerate',
+	'freeze',
+	'drain',
+	'rinse',
+	'simmer',
+	'boil',
+	'reduce',
+	'sprinkle',
+	'spread',
+	'roll',
+	'knead',
+	'divide',
+	'arrange',
+	'drizzle',
+	'discard',
+	'repeat',
+	'continue',
+	'meanwhile',
+	'add',
+	'saute',
+	'cut',
+	'slice',
+	'chop',
+	'wash',
+	'toss',
+	'marinate',
+	'rest',
+	'flip',
+	'turn',
+	'check',
+	'taste',
+	'adjust',
+	'assemble',
+]);
+// A real ingredient line is never both digit-free-at-the-start AND this long — a genuine long
+// ingredient ("2 cups fresh basil leaves, torn, plus extra for garnish") always starts with its own
+// quantity, so the leading-quantity check below still lets it through regardless of word count.
+const INSTRUCTIONAL_WORD_COUNT_THRESHOLD = 8;
+
+/** True for a narrative/instructional sentence rather than a real ingredient line — see the verb list
+ * above. Requires no parseable leading amount, so a genuinely long or verb-led ingredient line is never
+ * mistaken for one as long as it actually starts with (or is introduced by) a real quantity; and never
+ * fires on an optional/"to taste" line, which is handled by its own (deliberately permissive) path. */
+function isInstructionalLine(line: string): boolean {
+	const trimmed = line.trim();
+	if (trimmed.length === 0 || detectOptional(trimmed)) return false;
+
+	const words = trimmed.split(/\s+/);
+	const firstWord = words[0].toLowerCase().replace(/[^a-z-]/g, '');
+	const startsWithInstructionVerb = INSTRUCTION_LEADING_VERBS.has(firstWord);
+	if (!startsWithInstructionVerb && words.length < INSTRUCTIONAL_WORD_COUNT_THRESHOLD) return false;
+
+	const hasLeadingAmount =
+		extractQuantity(trimmed).quantity !== null ||
+		extractImplicitUnitQuantity(trimmed) !== null ||
+		extractNameFirstQuantity(trimmed) !== null;
+	return !hasLeadingAmount;
+}
+
 // Matches a bare "salt and/& pepper" line (with optional descriptors on either side and an optional
 // trailing "to taste"-style phrase), e.g. "Salt & black pepper", "kosher salt and freshly ground black
 // pepper", "Salt and pepper to taste". Scoped to lines with no digit at all (see the caller) — a
@@ -426,6 +514,7 @@ export function splitIntoLines(text: string): string[] {
 		.map((l) => l.replace(/[,;]+\s*$/, '').trim()) // trailing "2 cups oats," -> "2 cups oats"
 		.filter((l) => l.length > 0)
 		.filter((l) => !isSectionHeadingLine(l))
+		.filter((l) => !isInstructionalLine(l))
 		// Digit-free guard: a line with an explicit shared amount ("1 tsp salt and pepper") doesn't
 		// unambiguously split into two amounts, so it's left alone rather than guessed at.
 		.flatMap((l) => (/\d/.test(l) ? [l] : splitSaltAndPepperIdiom(l)))

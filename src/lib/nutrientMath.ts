@@ -57,19 +57,27 @@ export function computeDailyValuePercent(perServing: NutrientProfile): Record<st
 // genuinely low across sugar/sodium/sat-fat AND rich in fiber/protein can actually reach 9-10, and one
 // that's extreme on a bad nutrient can actually reach 1-2, instead of every recipe being squeezed into
 // a 4-7 band by a formula that only ever moves by 1 point in each direction.
-const BAD_NUTRIENT_BANDS: { maxDV: number; penalty: number }[] = [
-	{ maxDV: 5, penalty: 0 },
-	{ maxDV: 10, penalty: 1 },
-	{ maxDV: 20, penalty: 2 },
-	{ maxDV: 35, penalty: 3 },
-	{ maxDV: Infinity, penalty: 4 },
+// Label wording follows the same ≤5%=low / ≥20%=high FDA convention the bands themselves are built
+// on (21 CFR 101.9), rather than calling anything above the 5% floor "High" outright — a null label
+// means the tier moves the score but doesn't back a claim the FDA rule wouldn't itself support yet
+// (e.g. a 6.2%-DV nutrient is technically over the "low" floor but nowhere near "high").
+const BAD_NUTRIENT_BANDS: { maxDV: number; penalty: number; label: string | null }[] = [
+	{ maxDV: 5, penalty: 0, label: null },
+	{ maxDV: 10, penalty: 1, label: 'Elevated' },
+	{ maxDV: 20, penalty: 2, label: 'Moderately high' },
+	{ maxDV: 35, penalty: 3, label: 'High' },
+	{ maxDV: Infinity, penalty: 4, label: 'Very high' },
 ];
-const GOOD_NUTRIENT_BANDS: { maxDV: number; bonus: number }[] = [
-	{ maxDV: 5, bonus: 0 },
-	{ maxDV: 10, bonus: 1 },
-	{ maxDV: 20, bonus: 2 },
-	{ maxDV: 35, bonus: 3 },
-	{ maxDV: Infinity, bonus: 4 },
+// "Good source of" / "Excellent source of" mirror the FDA's own nutrient-content-claim thresholds
+// (21 CFR 101.54: "good source" requires 10-19% DV, "high"/"excellent source" requires >=20% DV) —
+// the 5-10% tier still earns its bonus point but doesn't get a label, since FDA rules wouldn't let a
+// real product call that a "good source" claim either.
+const GOOD_NUTRIENT_BANDS: { maxDV: number; bonus: number; label: string | null }[] = [
+	{ maxDV: 5, bonus: 0, label: null },
+	{ maxDV: 10, bonus: 1, label: null },
+	{ maxDV: 20, bonus: 2, label: 'Good source of' },
+	{ maxDV: 35, bonus: 3, label: 'Excellent source of' },
+	{ maxDV: Infinity, bonus: 4, label: 'Excellent source of' },
 ];
 
 function bandFor<T extends { maxDV: number }>(dv: number, bands: T[]): T {
@@ -86,30 +94,30 @@ export function computeHealthScore(perServing: NutrientProfile): HealthScore {
 	const fiberDV = ((perServing.fiber_g ?? 0) / DAILY_VALUES.fiber_g) * 100;
 	const proteinDV = ((perServing.protein_g ?? 0) / DAILY_VALUES.protein_g) * 100;
 
-	const sugarPenalty = bandFor(sugarDV, BAD_NUTRIENT_BANDS).penalty;
-	if (sugarPenalty > 0) {
-		score -= sugarPenalty;
-		rationale.push(sugarPenalty >= 3 ? 'Very high added/total sugar per serving' : 'High added/total sugar per serving');
+	const sugarBand = bandFor(sugarDV, BAD_NUTRIENT_BANDS);
+	if (sugarBand.penalty > 0) {
+		score -= sugarBand.penalty;
+		if (sugarBand.label) rationale.push(`${sugarBand.label} added/total sugar per serving`);
 	}
-	const sodiumPenalty = bandFor(sodiumDV, BAD_NUTRIENT_BANDS).penalty;
-	if (sodiumPenalty > 0) {
-		score -= sodiumPenalty;
-		rationale.push(sodiumPenalty >= 3 ? 'Very high sodium per serving' : 'High sodium per serving');
+	const sodiumBand = bandFor(sodiumDV, BAD_NUTRIENT_BANDS);
+	if (sodiumBand.penalty > 0) {
+		score -= sodiumBand.penalty;
+		if (sodiumBand.label) rationale.push(`${sodiumBand.label} sodium per serving`);
 	}
-	const satFatPenalty = bandFor(satFatDV, BAD_NUTRIENT_BANDS).penalty;
-	if (satFatPenalty > 0) {
-		score -= satFatPenalty;
-		rationale.push(satFatPenalty >= 3 ? 'Very high saturated fat per serving' : 'High saturated fat per serving');
+	const satFatBand = bandFor(satFatDV, BAD_NUTRIENT_BANDS);
+	if (satFatBand.penalty > 0) {
+		score -= satFatBand.penalty;
+		if (satFatBand.label) rationale.push(`${satFatBand.label} saturated fat per serving`);
 	}
-	const fiberBonus = bandFor(fiberDV, GOOD_NUTRIENT_BANDS).bonus;
-	if (fiberBonus > 0) {
-		score += fiberBonus;
-		rationale.push(fiberBonus >= 3 ? 'Excellent source of fiber' : 'Good source of fiber');
+	const fiberBand = bandFor(fiberDV, GOOD_NUTRIENT_BANDS);
+	if (fiberBand.bonus > 0) {
+		score += fiberBand.bonus;
+		if (fiberBand.label) rationale.push(`${fiberBand.label} fiber`);
 	}
-	const proteinBonus = bandFor(proteinDV, GOOD_NUTRIENT_BANDS).bonus;
-	if (proteinBonus > 0) {
-		score += proteinBonus;
-		rationale.push(proteinBonus >= 3 ? 'Excellent source of protein' : 'Good source of protein');
+	const proteinBand = bandFor(proteinDV, GOOD_NUTRIENT_BANDS);
+	if (proteinBand.bonus > 0) {
+		score += proteinBand.bonus;
+		if (proteinBand.label) rationale.push(`${proteinBand.label} protein`);
 	}
 
 	score = Math.max(1, Math.min(10, Math.round(score * 10) / 10));

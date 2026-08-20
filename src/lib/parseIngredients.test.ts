@@ -194,6 +194,27 @@ describe('splitIntoLines — hard rule: one line in, at most one ingredient out'
 		expect(lines).toHaveLength(1);
 	});
 
+	it('drops a narrative instruction sentence with an embedded digit instead of treating it as an ingredient', () => {
+		const text = `Preheat your oven to 350°F.
+2 cups all-purpose flour
+1 cup sugar
+1/2 cup butter, melted
+3 eggs
+1 tsp vanilla extract
+1 tsp baking soda`;
+		const lines = splitIntoLines(text);
+		expect(lines).toHaveLength(6);
+		expect(lines.some((l) => l.toLowerCase().includes('preheat'))).toBe(false);
+	});
+
+	it('drops a short instruction-verb-led line with no leading amount', () => {
+		expect(splitIntoLines('Season with salt and pepper')).toEqual([]);
+	});
+
+	it('does not drop a real ingredient line that happens to start with an instruction-like word once it has its own amount', () => {
+		expect(splitIntoLines('1 tsp mixed herbs')).toEqual(['1 tsp mixed herbs']);
+	});
+
 	it('drops ALL-CAPS section headings instead of treating them as ingredients', () => {
 		const text = `FOR THE CHICKEN
 - 500 grams chicken
@@ -226,8 +247,8 @@ FOR THE SAUCE
 	});
 
 	it('still strips real numbered-list markers like "1. " and "2) "', () => {
-		expect(splitIntoLines('1. Chop onions')).toEqual(['Chop onions']);
-		expect(splitIntoLines('2) Mix ingredients')).toEqual(['Mix ingredients']);
+		expect(splitIntoLines('1. onions')).toEqual(['onions']);
+		expect(splitIntoLines('2) garlic cloves')).toEqual(['garlic cloves']);
 	});
 
 	it('strips a trailing stray comma from a line, e.g. "2 cups oats,"', () => {
