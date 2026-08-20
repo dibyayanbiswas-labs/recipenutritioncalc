@@ -114,6 +114,10 @@ const STEM_EXCEPTIONS: Record<string, string> = {
 	chilies: 'chili',
 	chillies: 'chilli',
 	fries: 'fried',
+	// "cookies" ends in "-ies" but its singular is "cookie", not the "-y" the regular rule below would
+	// produce ("cooky") — without this, NAMED_DISH_WORDS' 'cookie' entry never actually matches
+	// "Chocolate chip cookies", since the entry's real stemmed token is "cooky".
+	cookies: 'cookie',
 };
 
 // A word ending in "-es" is ambiguous about how much to strip: most of the time the singular already
