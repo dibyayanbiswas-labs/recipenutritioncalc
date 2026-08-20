@@ -11,6 +11,11 @@ import { generateResultId, saveResult } from '../lib/kv';
 // the catalog moves and model listings churn.
 const OCR_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
 
+// Sentinel the OCR prompt asks the model to return verbatim when it can't find real ingredient text —
+// distinct from an empty response, which the model rarely gives even for a blank image (see the
+// transcribeImage handler's temperature/prompt comments for why this is needed at all).
+const NO_TEXT_SENTINEL = 'NONE';
+
 export const server = {
 	analyzeText: defineAction({
 		accept: 'form',
@@ -137,8 +142,13 @@ export const server = {
 				const aiResult = (await env.AI.run(OCR_MODEL, {
 					image: Array.from(bytes),
 					prompt:
-						'Transcribe every recipe ingredient line from this image exactly as written, one ingredient per line. Output only the ingredient lines — no commentary, no headings.',
+						'Transcribe every recipe ingredient line from this image exactly as written, one ingredient per line. Output only the ingredient lines — no commentary, no headings. ' +
+						`If the image is blank, unclear, or does not actually contain any legible recipe ingredient text, respond with exactly the single word ${NO_TEXT_SENTINEL} and nothing else — never invent or guess ingredients that aren't really there.`,
 					max_tokens: 1024,
+					// Near-zero temperature: this is a transcription task, not a creative one, and a low
+					// temperature measurably cuts down on the model inventing a plausible-looking ingredient
+					// list for a blank/unreadable image instead of admitting it can't read anything.
+					temperature: 0.1,
 				})) as { response?: string; description?: string };
 				text = aiResult.response ?? aiResult.description ?? '';
 			} catch (err) {
@@ -151,7 +161,12 @@ export const server = {
 				});
 			}
 
-			if (!text.trim()) {
+			// The sentinel check must be case/punctuation-loose: models don't always echo a bare token back
+			// verbatim (e.g. "NONE." or trailing commentary despite the instruction), so a strict equality
+			// check would let those slip through as if they were real transcribed text.
+			const isNoTextSentinel = new RegExp(`^${NO_TEXT_SENTINEL}\\b`, 'i').test(text.trim());
+
+			if (!text.trim() || isNoTextSentinel) {
 				throw new ActionError({
 					code: 'UNPROCESSABLE_CONTENT',
 					message: "Couldn't find any ingredient text in that photo. Try a clearer image or paste the ingredients instead.",

@@ -73,7 +73,13 @@ export async function analyzeIngredientLines(lines: ParsedIngredientLine[], ai?:
 
 			let aiProfile: NutrientProfile | null = null;
 			let matchConfidence: MatchConfidence | 'none' | 'ai-estimated' = match?.confidence ?? 'none';
-			if (!entry && ai && !line.isOptionalOrToTaste) {
+			// isOptionalOrToTaste alone isn't enough to skip the AI fallback: it's set whenever the line
+			// merely *mentions* "to taste"/"optional" wording, even when a real quantity was also given
+			// ("1/4 tsp salt, plus more to taste"). Skipping the estimate there silently zeroed that
+			// ingredient's nutrients entirely (resolveGrams still uses the real 1/4 tsp). Only a line with
+			// no quantity at all (a bare "salt to taste", which resolveGrams already zeroes to 0g) should
+			// skip the AI call.
+			if (!entry && ai && (!line.isOptionalOrToTaste || line.quantity !== null)) {
 				// Cache lookup is free (no Neurons spent) and doesn't touch the call budget below —
 				// only an actual model call does.
 				aiProfile = kv ? await getCachedEstimate(line.matchName, kv) : null;

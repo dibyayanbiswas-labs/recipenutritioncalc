@@ -72,7 +72,9 @@ export const UNIT_TABLE: Record<string, UnitDef> = {
 	box: { canonical: 'count', unitClass: 'count', toBase: 1 },
 	boxes: { canonical: 'count', unitClass: 'count', toBase: 1 },
 	pinch: { canonical: 'pinch', unitClass: 'weight', toBase: 0.36 },
+	pinches: { canonical: 'pinch', unitClass: 'weight', toBase: 0.36 },
 	dash: { canonical: 'dash', unitClass: 'volume', toBase: 0.6 },
+	dashes: { canonical: 'dash', unitClass: 'volume', toBase: 0.6 },
 };
 
 /** Aliases sorted longest-first so multi-word units match before a shorter substring would. */

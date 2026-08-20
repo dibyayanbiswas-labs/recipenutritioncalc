@@ -1,4 +1,4 @@
-import { UNICODE_FRACTIONS, UNIT_ALIASES, UNIT_TABLE, OPTIONAL_PHRASES } from './units';
+import { UNICODE_FRACTIONS, UNIT_ALIASES, UNIT_TABLE, OPTIONAL_PHRASES, type UnitClass } from './units';
 
 export interface ParsedIngredientLine {
 	raw: string;
@@ -19,6 +19,19 @@ const UNIT_ALIAS_PATTERN = UNIT_ALIASES.map(escapeRegExp).join('|');
 
 function escapeRegExp(s: string): string {
 	return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Words/phrases that carry no food-identity information but often survive next to a real amount —
+// "1/4 tsp salt, plus more to taste" — harmless for display (kept in `notes`) but poison food-database
+// matching when left in the match query, e.g. "salt plus more" failing to match "salt, table" even
+// though "salt" alone matches instantly.
+const MATCH_NOISE_PHRASES = ['plus more', 'plus extra', 'or more', 'and more'];
+function stripMatchNoise(text: string): string {
+	let result = text;
+	for (const phrase of MATCH_NOISE_PHRASES) {
+		result = result.replace(new RegExp(`\\b${escapeRegExp(phrase)}\\b`, 'gi'), ' ');
+	}
+	return result.replace(/\s+/g, ' ').trim();
 }
 
 /** Inserts a space at letter/digit boundaries, so "rice500g" reads as "rice 500 g". */
@@ -144,17 +157,42 @@ function extractQuantity(text: string): {
 	return { quantity: null, quantityRange: null, rest: text };
 }
 
-function extractUnit(text: string): { unit: string | null; rest: string } {
+function extractUnit(text: string): { unit: string | null; unitClass: UnitClass | null; rest: string } {
 	const match = text.match(new RegExp(`^(${UNIT_ALIAS_PATTERN})\\b\\.?(?:\\s+|$)`, 'i'));
 	if (match) {
 		// Exact case checked first: "T" (tablespoon) and "t" (teaspoon) are distinct, meaningful
 		// aliases — lowercasing before the lookup would collapse both onto "t" (teaspoon) always.
 		const def = UNIT_TABLE[match[1]] ?? UNIT_TABLE[match[1].toLowerCase()];
 		if (def) {
-			return { unit: def.canonical, rest: text.slice(match[0].length) };
+			return { unit: def.canonical, unitClass: def.unitClass, rest: text.slice(match[0].length) };
 		}
 	}
-	return { unit: null, rest: text };
+	return { unit: null, unitClass: null, rest: text };
+}
+
+// A container noun ("cans", "boxes", ...) sometimes trails a weight/volume unit that's already fully
+// captured the amount, e.g. "2 x 400g cans chopped tomatoes" (800g total, already resolved by the "g").
+// Left in place, the leftover container word becomes noise in the ingredient name and blocks matching
+// ("cans chopped tomatoes" fails to match "tomatoes, canned, ..."). Only stripped after a weight/volume
+// unit — when the unit itself is the container word ("2 cans beans"), it's the real, meaningful unit and
+// must not be touched.
+const CONTAINER_NOISE_WORDS = ['can', 'cans', 'packet', 'packets', 'box', 'boxes', 'container', 'containers'];
+const CONTAINER_NOISE_PATTERN = new RegExp(`^(?:${CONTAINER_NOISE_WORDS.join('|')})\\b\\.?\\s*`, 'i');
+
+// A bare "pinch"/"dash" at the very start of a line names the quantity (1) and the unit at once — e.g.
+// "Pinch of salt", "A dash of hot sauce" — unlike every other unit, which only resolves after an
+// explicit leading number ("1 tsp salt"). Without this, such lines have no quantity and no unit at all,
+// and fall back to a full 100g generic count weight — hugely overstating what's meant to be a trace
+// amount (a pinch is ~0.36g, roughly 300x less).
+const IMPLICIT_UNIT_WORDS = ['pinch', 'dash'];
+const IMPLICIT_UNIT_PATTERN = new RegExp(`^(?:(?:a|an)\\s+)?(${IMPLICIT_UNIT_WORDS.join('|')})(?:es)?\\b\\.?\\s*(?:of\\s+)?`, 'i');
+
+function extractImplicitUnitQuantity(text: string): { quantity: number; unit: string; rest: string } | null {
+	const match = text.match(IMPLICIT_UNIT_PATTERN);
+	if (!match) return null;
+	const unitDef = UNIT_TABLE[match[1].toLowerCase()];
+	if (!unitDef) return null;
+	return { quantity: 1, unit: unitDef.canonical, rest: text.slice(match[0].length) };
 }
 
 /** A separator only counts as a "name — amount" divider when it has whitespace around a dash/em-dash,
@@ -176,6 +214,22 @@ function extractNameFirstQuantity(
 	if (quantity === null) return null;
 	const { unit, rest } = extractUnit(afterQuantity);
 	return { name: name.trim(), quantity, quantityRange, unit, rest };
+}
+
+/** Last-resort fallback for a name directly followed by an amount with no separator at all, e.g.
+ * "chopped tomatoes 800g" or "flour 2 cups" — only fires when a recognized unit sits at the very end.
+ * A trailing bare number with no unit is too ambiguous to safely reinterpret this way (could be
+ * anything), so that case is deliberately left alone; without this, though, a clearly-marked trailing
+ * "800g" was silently discarded and replaced with a generic 100g guess. */
+function extractTrailingQuantity(text: string): { name: string; quantity: number; unit: string } | null {
+	const match = text.match(new RegExp(`^(.+?)\\s+(${QUANTITY_TOKEN})\\s*(${UNIT_ALIAS_PATTERN})\\b\\.?\\s*$`, 'i'));
+	if (!match) return null;
+	const [, name, qtyToken, unitToken] = match;
+	const quantity = parseQuantityToken(qtyToken);
+	if (quantity === null) return null;
+	const unitDef = UNIT_TABLE[unitToken] ?? UNIT_TABLE[unitToken.toLowerCase()];
+	if (!unitDef) return null;
+	return { name: name.trim(), quantity, unit: unitDef.canonical };
 }
 
 /** A parenthetical giving an explicit weight/volume, e.g. "(150 g)" or "(80–100 g)", is more
@@ -206,16 +260,19 @@ function extractWeightOverride(
 	};
 }
 
-// Preparation words that describe how an ingredient was cut/handled rather than what it is —
-// safe to strip from the name before food-database matching. Deliberately excludes words like
-// "ground" that usually name a distinct product in nutrition data (ground beef vs. beef, ground
-// cinnamon vs. cinnamon stick), where stripping would change which food gets matched.
+// Preparation/ripeness words that describe how an ingredient was cut/handled or its ripeness rather
+// than what it is — safe to strip from the name before food-database matching. Deliberately excludes
+// words like "ground" that usually name a distinct product in nutrition data (ground beef vs. beef,
+// ground cinnamon vs. cinnamon stick), where stripping would change which food gets matched.
 const PREP_WORDS = [
 	'chopped',
 	'diced',
 	'minced',
 	'grated',
 	'sliced',
+	'ripe',
+	'unripe',
+	'overripe',
 	'crushed',
 	'shredded',
 	'peeled',
@@ -400,14 +457,35 @@ export function parseIngredientLine(raw: string): ParsedIngredientLine {
 		const extractedUnit = extractUnit(working);
 		unit = extractedUnit.unit;
 		working = extractedUnit.rest;
+		// A container word directly after an already-resolved weight/volume unit ("400g cans...") is
+		// redundant noise, not a second amount — see CONTAINER_NOISE_PATTERN. When the unit itself IS
+		// the container ("2 cans beans", unitClass 'count'), this is skipped, since it's the real unit.
+		if (extractedUnit.unitClass && extractedUnit.unitClass !== 'count') {
+			working = working.replace(CONTAINER_NOISE_PATTERN, '');
+		}
 	} else {
-		const fromName = extractNameFirstQuantity(working);
-		if (fromName) {
-			quantity = fromName.quantity;
-			quantityRange = fromName.quantityRange;
-			unit = fromName.unit;
-			working = fromName.rest;
-			nameFirst = fromName.name;
+		const implicitUnit = extractImplicitUnitQuantity(working);
+		if (implicitUnit) {
+			quantity = implicitUnit.quantity;
+			unit = implicitUnit.unit;
+			working = implicitUnit.rest;
+		} else {
+			const fromName = extractNameFirstQuantity(working);
+			if (fromName) {
+				quantity = fromName.quantity;
+				quantityRange = fromName.quantityRange;
+				unit = fromName.unit;
+				working = fromName.rest;
+				nameFirst = fromName.name;
+			} else {
+				const fromTrailing = extractTrailingQuantity(working);
+				if (fromTrailing) {
+					quantity = fromTrailing.quantity;
+					unit = fromTrailing.unit;
+					working = '';
+					nameFirst = fromTrailing.name;
+				}
+			}
 		}
 	}
 
@@ -432,8 +510,12 @@ export function parseIngredientLine(raw: string): ParsedIngredientLine {
 	let notes: string | null;
 	let matchExtra: string;
 	if (nameFirst) {
-		ingredientName = nameFirst;
-		notes = [leftoverName, leftoverNotes].filter((s) => s && s.length > 0).join(', ') || null;
+		// A leading/trailing cut-prep word can end up inside `nameFirst` itself (e.g. "chopped tomatoes"
+		// from extractTrailingQuantity) exactly as it can in the primary quantity-first flow — strip it
+		// the same way so it doesn't block matching (e.g. "chopped tomatoes" -> "tomatoes").
+		const { text: nameFirstWithoutPrep, prep: nameFirstPrep } = extractPreparationWord(nameFirst);
+		ingredientName = nameFirstWithoutPrep;
+		notes = [nameFirstPrep, leftoverName, leftoverNotes].filter((s) => s && s.length > 0).join(', ') || null;
 		// Neither piece is part of the food's identity here (that's already `nameFirst`) — both are
 		// pure descriptors, so both can carry a prep/processing state relevant to matching, e.g.
 		// "Chickpeas: 1/2 cup drained and rinsed" puts "drained and rinsed" in `leftoverName` itself.
@@ -460,7 +542,7 @@ export function parseIngredientLine(raw: string): ParsedIngredientLine {
 		notes = [notes, `or ${orMatch[2].trim()}`].filter((s) => s && s.length > 0).join(', ') || null;
 	}
 
-	const matchName = [ingredientName, matchExtra].filter((s) => s && s.length > 0).join(' ').trim();
+	const matchName = stripMatchNoise([ingredientName, matchExtra].filter((s) => s && s.length > 0).join(' ').trim());
 
 	return {
 		raw,
