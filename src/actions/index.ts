@@ -63,6 +63,13 @@ export const server = {
 
 			const id = generateResultId();
 			const text = extracted.recipe.ingredientLines.join('\n');
+			// A scraped recipeYield of exactly 1 is frequently a whole-dish count mislabeled as a
+			// serving count (e.g. a page's schema.org data giving bare "1" for "1 loaf"/"1 batch"/"1
+			// pie" — the unit word usually isn't even preserved in the machine-readable yield, so
+			// there's no way to detect the specific case, only the general pattern) rather than a
+			// genuinely single-serving recipe. Surfacing this only when the user hasn't already
+			// overridden it themselves.
+			const servingsIsUnverifiedSingleYield = !servingsOverride && extracted.recipe.servings === 1;
 			const result = await analyzeRecipeText({
 				id,
 				title: extracted.recipe.title,
@@ -72,6 +79,9 @@ export const server = {
 				createdAt: Date.now(),
 				ai: env.AI,
 				kv: env.RESULTS_KV,
+				formatWarning: servingsIsUnverifiedSingleYield
+					? "This recipe's source page lists its yield as 1 — that's often a whole dish (e.g. \"1 loaf\" or \"1 batch\"), not a single serving. Double-check and adjust the servings count if needed."
+					: null,
 			});
 			await saveResult(env.RESULTS_KV, result);
 			return result;

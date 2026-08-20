@@ -145,7 +145,12 @@ function stem(word: string): string {
 function tokenizeOrdered(s: string): string[] {
 	const seen = new Set<string>();
 	const ordered: string[] = [];
-	for (const raw of s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)) {
+	// Normalize accented Latin letters ("jalapeño", "crème fraîche") to their plain-ASCII base
+	// ("jalapeno", "creme fraiche") before the [^a-z0-9] strip below — otherwise that strip removes
+	// the accent character entirely rather than folding it, breaking the word into unmatched pieces
+	// (e.g. "jalapeño" -> "jalape"/"o") even though the database's entry is the plain-ASCII spelling.
+	const normalized = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+	for (const raw of normalized.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)) {
 		if (raw.length === 0 || STOP_WORDS.has(raw)) continue;
 		const t = stem(raw);
 		if (!seen.has(t)) {
@@ -224,7 +229,12 @@ const CONCENTRATE_PENALTY = 0.6;
 // entry: those are all named "Potatoes, french fried, ..." in the source data (potato as the head
 // noun, so they get no primary-segment bonus for a "french fries" query at all), so "french toast"'s
 // primary-segment credit for sharing "french" was otherwise enough to win outright.
-const NAMED_DISH_WORDS = new Set(['spanish', 'duchesse', 'toast']);
+// 'cookie' (stemmed from "cookies") added because there's no raw "chocolate chips" entry in the
+// database at all — every "chocolate chip ___" row is a prepared dish (cookies, granola bars,
+// waffles) — so "chocolate chips" was winning against "Chocolate chip cookies" at high confidence
+// purely because "cookies" happened to be the only extra qualifier word. Demoting it here means a
+// genuinely unmatched raw ingredient correctly falls through to the AI-estimate fallback instead.
+const NAMED_DISH_WORDS = new Set(['spanish', 'duchesse', 'toast', 'cookie']);
 
 // --- Inverted index, built once per Worker isolate (amortized across requests, not per-request cost) ---
 // Scoring always happens against an entry's full canonical NAME (never a short alias) — a short
