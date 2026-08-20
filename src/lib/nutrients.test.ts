@@ -96,4 +96,13 @@ describe('recipe text -> nutrition pipeline', () => {
 		expect(result.grams).toBeGreaterThanOrEqual(350);
 		expect(result.grams).toBeLessThanOrEqual(450);
 	});
+
+	it('gives a bare, unquantified "oil" line a drizzle-sized weight, not a whole-produce-item guess', async () => {
+		// Regression: a URL-scraped recipe listing a bare "oil" (no amount — left to the cook, e.g.
+		// "oil, for frying") used to fall back to GENERIC_COUNT_WEIGHT_G (100g, sized for "1 onion"),
+		// pricing in ~880 kcal of pure fat for an ingredient the recipe never quantified at all.
+		const [result] = await analyze('oil');
+		expect(result.grams).toBeLessThan(20);
+		expect(result.grams).toBeGreaterThan(0);
+	});
 });

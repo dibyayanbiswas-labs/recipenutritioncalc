@@ -9,6 +9,16 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   site: 'https://recipenutritioncalc.com',
   output: 'server',
+  security: {
+    // Astro's action body limit defaults to 1MB, well under the 8MB photo-upload budget the rest of
+    // the app is built around (see MAX_IMAGE_BYTES in src/actions/index.ts and MAX_UPLOAD_BYTES in
+    // PhotoUploadForm.astro) — without raising it, any camera photo the client didn't need to resize
+    // (anything already under PhotoUploadForm's 1.5MB SKIP_RESIZE_BELOW_BYTES threshold) or that
+    // resizing still left over 1MB was rejected with a raw "Request body exceeds 1048576 bytes" error
+    // before the app's own friendly oversize message ever had a chance to fire. A little headroom
+    // over 8MB covers multipart/form-data's encoding overhead on top of the raw image bytes.
+    actionBodySizeLimit: 9 * 1024 * 1024,
+  },
   adapter: cloudflare({
     // Workers AI (the `AI` binding) has no local emulation, so the Cloudflare Vite
     // plugin otherwise tries to open a remote proxy session to the real Workers AI

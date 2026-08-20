@@ -82,4 +82,35 @@ describe('matchIngredient — regression: bare-word and off-type mismatches', ()
 		expect(sea?.entry.name).toBe(plain?.entry.name);
 		expect(kosher?.confidence).not.toBe('low');
 	});
+
+	it('"unsalted butter" matches the well-tagged US "butter, without salt" entry, not an untagged regional "unsalted" entry', () => {
+		const m = matchIngredient('unsalted butter', 'US');
+		expect(m).not.toBeNull();
+		expect(m!.entry.region).toBe('US');
+		expect(m!.entry.name.toLowerCase()).toContain('butter');
+		// The bug: "unsalted" only appears verbatim in UK/CA/IN "Butter, unsalted" entries, none of which
+		// carry allergen data — silently dropping the Milk allergen tag for an obviously dairy ingredient.
+		expect(m!.entry.allergens).toContain('milk');
+	});
+
+	it('a bare "milk" query means everyday dairy milk, not buttermilk, chocolate milk, or another specialty product', () => {
+		const m = matchIngredient('milk', 'US');
+		expect(m).not.toBeNull();
+		const name = m!.entry.name.toLowerCase();
+		expect(name).toContain('milk');
+		for (const wrongVariant of ['buttermilk', 'chocolate', 'producer', 'filled', 'evaporated', 'imitation', 'dry', 'canned']) {
+			expect(name).not.toContain(wrongVariant);
+		}
+		expect(m!.entry.allergens).toContain('milk');
+	});
+
+	it('"soy sauce" matches a well-tagged US entry, not an untagged regional "Sauce, soy, commercial" entry', () => {
+		const m = matchIngredient('soy sauce', 'US');
+		expect(m).not.toBeNull();
+		expect(m!.entry.region).toBe('US');
+		// The bug: US soy sauce entries are named "soy sauce made from X" with no comma, so they lost
+		// the primary-segment precision bonus entirely and fell behind a terser AU "Sauce, soy,
+		// commercial" entry that carries no allergen data at all — silently dropping the soy allergen.
+		expect(m!.entry.allergens).toContain('soy');
+	});
 });

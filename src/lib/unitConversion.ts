@@ -25,6 +25,19 @@ function isSeasoningEntry(entry: IngredientEntry): boolean {
 	return firstSegment === 'spices' || firstSegment === 'salt';
 }
 
+// Same problem as the seasoning case above, just for cooking oil: a bare, unitless "oil" line (e.g.
+// scraped from a recipe that just lists "oil" for frying, with the amount left to the cook) has no
+// count semantics either, but every regional DB prefixes fat/oil entries with an "Oil, ..." category
+// name the same way it prefixes spices — so this is caught the same way. Defaulting to a full
+// produce-item-sized 100g priced in ~880 kcal of pure fat for a recipe that never gave an amount,
+// often dwarfing every other ingredient's contribution combined. ~1 tbsp is the common real-world
+// "drizzle"/pan-frying amount.
+const OIL_DEFAULT_G = 13.5;
+function isOilEntry(entry: IngredientEntry): boolean {
+	const firstSegment = entry.name.split(',')[0].trim().toLowerCase();
+	return firstSegment === 'oil';
+}
+
 // A standard retail can (soup, beans, tomatoes, coconut milk, ...) runs ~400g/14-15oz regardless of
 // what's in it — the can size is a property of the container, not the specific food, unlike "piece"
 // or "slice" where no single number is meaningful. Without this, "1 can black beans" or "1 can
@@ -80,7 +93,11 @@ export function resolveGrams(line: ParsedIngredientLine, entry: IngredientEntry 
 	}
 
 	const unitDef = line.unit ? UNIT_TABLE[line.unit] ?? findByCanonical(line.unit) : null;
-	const genericCountWeight = entry && isSeasoningEntry(entry) ? SEASONING_DEFAULT_G : GENERIC_COUNT_WEIGHT_G;
+	const genericCountWeight = entry && isSeasoningEntry(entry)
+		? SEASONING_DEFAULT_G
+		: entry && isOilEntry(entry)
+			? OIL_DEFAULT_G
+			: GENERIC_COUNT_WEIGHT_G;
 
 	// No unit at all — treat as a count (e.g. "2 eggs", "1 onion").
 	if (!unitDef) {

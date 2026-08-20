@@ -5,23 +5,14 @@ import { analyzeIngredientLines, analyzeRecipeText, buildNutritionResult } from 
 import { checkIngredientTextFormat, parseIngredientLine } from '../lib/parseIngredients';
 import { extractRecipeFromUrl } from '../lib/schemaOrgRecipe';
 import { generateResultId, saveResult } from '../lib/kv';
-
-// Verified against Cloudflare's model catalog at implementation time; re-check
-// developers.cloudflare.com/workers-ai/models/ if this ever needs swapping —
-// the catalog moves and model listings churn.
-const OCR_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
-
-// Sentinel the OCR prompt asks the model to return verbatim when it can't find real ingredient text —
-// distinct from an empty response, which the model rarely gives even for a blank image (see the
-// transcribeImage handler's temperature/prompt comments for why this is needed at all).
-const NO_TEXT_SENTINEL = 'NONE';
+import { transcribeIngredientImage } from '../lib/transcribeImage';
 
 // A full-resolution mobile camera photo can be several MB — read into a Uint8Array and then spread into
-// a plain number array for the AI binding (see transcribeImage below), that's easily enough to exceed
-// the Worker's memory limit ("exceeded maximum capacity") before the model ever sees it. The client
-// resizes photos above this size before upload (see PhotoUploadForm.astro), so this is a safety net for
-// whatever gets here anyway — a non-JS client, or a resize that silently failed — returning a clear
-// error instead of risking an out-of-memory crash.
+// a plain number array for the AI binding (see transcribeIngredientImage), that's easily enough to
+// exceed the Worker's memory limit ("exceeded maximum capacity") before the model ever sees it. The
+// client resizes photos above this size before upload (see PhotoUploadForm.astro), so this is a safety
+// net for whatever gets here anyway — a non-JS client, or a resize that silently failed — returning a
+// clear error instead of risking an out-of-memory crash.
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 export const server = {
@@ -153,18 +144,7 @@ export const server = {
 			const bytes = new Uint8Array(await image.arrayBuffer());
 			let text: string;
 			try {
-				const aiResult = (await env.AI.run(OCR_MODEL, {
-					image: Array.from(bytes),
-					prompt:
-						'Transcribe every recipe ingredient line from this image exactly as written, one ingredient per line. Output only the ingredient lines — no commentary, no headings. ' +
-						`If the image is blank, unclear, or does not actually contain any legible recipe ingredient text, respond with exactly the single word ${NO_TEXT_SENTINEL} and nothing else — never invent or guess ingredients that aren't really there.`,
-					max_tokens: 1024,
-					// Near-zero temperature: this is a transcription task, not a creative one, and a low
-					// temperature measurably cuts down on the model inventing a plausible-looking ingredient
-					// list for a blank/unreadable image instead of admitting it can't read anything.
-					temperature: 0.1,
-				})) as { response?: string; description?: string };
-				text = aiResult.response ?? aiResult.description ?? '';
+				text = await transcribeIngredientImage(bytes, env.AI);
 			} catch (err) {
 				// Logged so the real cause (e.g. no local Workers AI emulation — see astro.config.mjs) is
 				// visible in `astro dev logs` / `wrangler tail`, instead of only the generic message below.
@@ -175,19 +155,14 @@ export const server = {
 				});
 			}
 
-			// The sentinel check must be case/punctuation-loose: models don't always echo a bare token back
-			// verbatim (e.g. "NONE." or trailing commentary despite the instruction), so a strict equality
-			// check would let those slip through as if they were real transcribed text.
-			const isNoTextSentinel = new RegExp(`^${NO_TEXT_SENTINEL}\\b`, 'i').test(text.trim());
-
-			if (!text.trim() || isNoTextSentinel) {
+			if (!text) {
 				throw new ActionError({
 					code: 'UNPROCESSABLE_CONTENT',
 					message: "Couldn't find any ingredient text in that photo. Try a clearer image or paste the ingredients instead.",
 				});
 			}
 
-			return { text: text.trim() };
+			return { text };
 		},
 	}),
 };

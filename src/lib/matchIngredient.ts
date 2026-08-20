@@ -185,6 +185,15 @@ const UNCOMMON_VARIANT_WORDS = new Set([
 	'mare',
 	'donkey',
 	'reindeer',
+	// A bare "milk" query means the everyday dairy-case product, not the cultured, tangier buttermilk, a
+	// sweetened chocolate-flavored drink, or dairy-industry "producer" (unprocessed, straight-from-farm)
+	// milk — but each of those has far fewer qualifier tokens than the correctly-tagged "milk, whole,
+	// 3.25% milkfat, with added vitamin d" (USDA spells the latter out in full), so they kept winning the
+	// qualifier-count race one after another as each prior specialty variant got demoted. Demoted only
+	// when the query doesn't explicitly ask for that variant.
+	'buttermilk',
+	'chocolate',
+	'producer',
 	'black', // only demoted when the query itself doesn't say "black" (see the exemption below) —
 	// otherwise a plain "rice"/"pepper" query lands on the uncommon black-rice/variety entry purely
 	// because its qualifier chain happens to be shorter than the everyday white/standard version.
@@ -216,6 +225,10 @@ const SUBSTITUTE_PRODUCT_WORDS = new Set([
 	// A bare "mayonnaise" query means the everyday egg-based condiment, not a tofu-based substitute —
 	// same problem, just for a plant-based swap instead of an animal one.
 	'tofu',
+	// "Filled" milk replaces the milk fat with vegetable oil — a distinct substitute product, not a
+	// description of everyday milk, but its terse USDA name ("milk, filled, fluid, with lauric acid
+	// oil") still out-qualifier-counts the genuine article for a bare "milk" query.
+	'filled',
 ]);
 const SUBSTITUTE_PRODUCT_PENALTY = 0.5;
 // A recipe naming a plain ingredient almost always means its everyday fresh/liquid form, not a
@@ -233,6 +246,15 @@ const PROCESSED_FORM_WORDS = new Set([
 	'pickled',
 	'flavoured',
 	'flavored',
+	// Evaporated milk is concentrated by removing most of its water — roughly double the calorie/fat
+	// density of fresh milk per 100g — the same "don't substitute a concentrate for the fresh liquid"
+	// problem CONCENTRATE_WORDS solves for bouillon, just without its own distinct unit-conversion risk.
+	'evaporated',
+	// A specialty reformulation beyond the standard, ubiquitous vitamin A/D fortification already baked
+	// into "everyday" US milk/margarine labeling (e.g. "calcium fortified", "protein fortified") — a
+	// bare ingredient name means the standard product, not this extra reformulation, same reasoning as
+	// SODIUM_MODIFIER_WORDS just below.
+	'fortified',
 ]);
 // A recipe naming a plain ingredient means the everyday, standard-sodium version — not a "reduced/low
 // sodium" reformulation — but the reformulated product often has a shorter, terser name than the
@@ -279,6 +301,17 @@ const NAMED_DISH_WORDS = new Set(['spanish', 'duchesse', 'toast', 'cookie']);
 // through to a much less accurate AI estimate for one of the most common savory recipe ingredients.
 const SALT_DESCRIPTOR_WORDS = new Set(['kosher', 'sea', 'fine', 'coarse', 'flaky', 'flake', 'rock', 'iodized', 'himalayan', 'pink']);
 
+// USDA spells "no added salt" three different, inconsistent ways depending on the food: some entries
+// literally use the word "unsalted" (e.g. "snacks, popcorn, air-popped (unsalted)"), others spell it
+// out as "without salt" (e.g. "butter, without salt") or "no salt added" (e.g. "beans, baked, canned,
+// no salt added") — a plain token intersection only ever catches whichever spelling the query happens
+// to use, so "unsalted butter" (2 query tokens) scored only 0.5 coverage against "butter, without
+// salt" — one shy of MIN_MATCH_COVERAGE — and fell through to whichever OTHER region's database had a
+// literal "Butter, unsalted" entry, several of which (UK/CA/IN) carry no allergen data at all. Treating
+// "unsalted" as satisfied by either spelling keeps the well-tagged US entry in contention without
+// weakening the literal "unsalted" match that already works fine on its own.
+const UNSALTED_SYNONYM_TOKEN_GROUPS: string[][] = [['without', 'salt'], ['no', 'salt', 'added']];
+
 // --- Inverted index, built once per Worker isolate (amortized across requests, not per-request cost) ---
 // Scoring always happens against an entry's full canonical NAME (never a short alias) — a short
 // alias like "oil" or "spices" would otherwise win matches purely by having few tokens to penalize,
@@ -313,6 +346,16 @@ const entryNameTokens: Set<string>[] = entryNameTokensOrdered.map((t) => new Set
 // name counts as the primary segment and only gets partial credit — enough for a nutritionally unrelated
 // peanut sauce to outrank actual soy sauce.
 const CATEGORY_PREFIX_DENYLIST = new Set(['spices', 'nuts', 'seeds', 'grains', 'fish', 'game meat', 'crustaceans', 'mollusks', 'soup', 'sauce']);
+// A handful of entries (US soy sauce's three variants, one CA soy sauce, one UK ghee) describe
+// themselves as "<food> made from/with <method>" instead of any comma-delimited convention at all —
+// with no comma to split on, entryPrimaryTokens fell back to the ENTIRE name as the primary segment,
+// e.g. "soy sauce made from hydrolyzed vegetable protein" (7 tokens, only 2 — "soy"/"sauce" — matching
+// a "soy sauce" query, 0.29 precision). That's weak enough that even the +0.3 REGION_MATCH_BONUS for a
+// 'US' query couldn't overcome a terser, untagged same-food entry from another region ("Sauce, soy,
+// commercial", 1-token primary segment, full precision) — silently dropping the soy allergen tag by
+// picking the region with no allergen data at all over the one that actually has it. Optional "(" before
+// "made" covers the one CA entry that parenthesizes instead of using "made from/with" bare.
+const MADE_FROM_PATTERN = /^(.*?)\s*\(?\s*made\s+(?:from|with)\s+/i;
 const entryPrimaryTokens: Set<string>[] = INGREDIENTS.map((e) => {
 	const segments = e.name.split(',');
 	// Lowercased before the denylist check: only the US (USDA) source consistently lowercases these
@@ -320,6 +363,10 @@ const entryPrimaryTokens: Set<string>[] = INGREDIENTS.map((e) => {
 	// cinnamon, ground"), so a case-sensitive check silently never matched for 4 of the 5 regions.
 	const first = segments[0].trim();
 	if (segments.length > 1 && CATEGORY_PREFIX_DENYLIST.has(first.toLowerCase())) return tokenize(segments[1]);
+	if (segments.length === 1) {
+		const madeFromMatch = first.match(MADE_FROM_PATTERN);
+		if (madeFromMatch) return tokenize(madeFromMatch[1]);
+	}
 	return tokenize(first);
 });
 // Precomputed per-entry lowercased first segment — used for the bare-"pepper" tiebreak below.
@@ -393,7 +440,10 @@ export function matchIngredient(name: string, region?: RegionCode): IngredientMa
 	for (const entryIndex of candidateEntryIndices) {
 		const nameTokens = entryNameTokens[entryIndex];
 		let intersection = 0;
-		for (const t of queryTokens) if (nameTokens.has(t)) intersection++;
+		for (const t of queryTokens) {
+			if (nameTokens.has(t)) intersection++;
+			else if (t === 'unsalted' && UNSALTED_SYNONYM_TOKEN_GROUPS.some((g) => g.every((w) => nameTokens.has(w)))) intersection++;
+		}
 		const coverage = intersection / queryTokens.size;
 
 		const extraTokens = nameTokens.size - intersection;
