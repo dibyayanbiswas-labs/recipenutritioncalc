@@ -399,6 +399,14 @@ const entryPrimaryTokens: Set<string>[] = INGREDIENTS.map((e) => {
 // Precomputed per-entry lowercased first segment — used for the bare-"pepper" tiebreak below.
 const entryPrimaryCategory: string[] = INGREDIENTS.map((e) => e.name.split(',')[0].trim().toLowerCase());
 const BARE_PEPPER_SPICE_BONUS = 0.3;
+// A bare "paneer" query means the plain cheese, but the one genuine entry ("Cheese, Paneer", UK data)
+// names itself category-first, so its primary segment is "cheese" and it gets no primary-match bonus at
+// all — while the IN database's 30+ prepared-dish entries that happen to literally start with the word
+// "Paneer" ("Paneer, apple and pineapple salad", "Paneer kofta curry", ...) each win the full bonus
+// purely from that shared first word, despite being a completely different food. Same class of problem
+// BARE_PEPPER_SPICE_BONUS solves above, just inverted (the correct entry is category-first here, not
+// the wrong ones).
+const BARE_PANEER_BONUS = 0.6;
 const invertedIndex = new Map<string, number[]>(); // token -> entry indices
 
 for (let entryIndex = 0; entryIndex < INGREDIENTS.length; entryIndex++) {
@@ -557,6 +565,9 @@ export function matchIngredient(name: string, region?: RegionCode): IngredientMa
 		// a bare query never says "black" either.
 		if (queryTokens.size === 1 && queryTokens.has('pepper') && entryPrimaryCategory[entryIndex] === 'spices') {
 			rankScore += BARE_PEPPER_SPICE_BONUS;
+		}
+		if (queryTokens.size === 1 && queryTokens.has('paneer') && entryPrimaryCategory[entryIndex] === 'cheese') {
+			rankScore += BARE_PANEER_BONUS;
 		}
 		if (hasConcentrateWord && !queryHasConcentrateWord) {
 			rankScore -= CONCENTRATE_PENALTY;
