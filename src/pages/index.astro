@@ -95,19 +95,19 @@ const steps = [
 	{
 		n: '02',
 		title: 'Every ingredient gets matched',
-		body: 'Quantities and units are parsed and converted to grams, then matched against a USDA-derived nutrition database — flagged clearly if a match is approximate.',
+		body: 'Quantities and units are parsed and converted to grams, then matched against a USDA-derived nutrition database - flagged clearly if a match is approximate.',
 	},
 	{
 		n: '03',
 		title: 'Get the full nutrition picture',
-		body: 'Calories, full macros, 20+ micronutrients, and a health score per serving — plus a shareable link, generated automatically.',
+		body: 'Calories, full macros, 20+ micronutrients, and a health score per serving - plus a shareable link, generated automatically.',
 	},
 ];
 
 const features = [
 	{
 		title: 'Every macro, 20+ micros',
-		body: 'Calories, protein, carbs, fat, fiber, sugar, sodium, plus vitamins and minerals with %DV — most calculators stop at six numbers.',
+		body: 'Calories, protein, carbs, fat, fiber, sugar, sodium, plus vitamins and minerals with %DV - most calculators stop at six numbers.',
 	},
 	{
 		title: 'Free, start to finish',
@@ -120,6 +120,10 @@ const features = [
 	{
 		title: 'Three ways to add a recipe',
 		body: 'Paste text, drop in a URL, or upload a photo. Same detailed breakdown, whichever way you start.',
+	},
+	{
+		title: 'Installable, app-free',
+		body: 'Add it to your home screen or dock for one-tap access - no app store, no download. Works on Android, iPhone, and desktop.',
 	},
 ];
 
@@ -137,8 +141,8 @@ const appStructuredData = {
 ---
 
 <Layout
-	title="Recipe Nutrition Calculator — Free Calorie & Macro Calculator"
-	description="Free recipe nutrition calculator: paste ingredients, a URL, or a photo for an instant recipe calorie calculator breakdown — calories, macros, and 20+ micronutrients per serving. No login, no paywall."
+	title="Recipe Nutrition Calculator - Free Calorie & Macro Calculator"
+	description="Free recipe nutrition calculator: paste ingredients, a URL, or a photo for an instant recipe calorie calculator breakdown - calories, macros, and 20+ micronutrients per serving. No login, no paywall."
 	structuredData={[appStructuredData]}
 >
 	<section class="relative">
@@ -166,7 +170,7 @@ const appStructuredData = {
 				</h1>
 				<p class="text-body-lg text-body mt-sm">
 					Paste a recipe, drop in a link, or snap a photo. This online recipe nutrition calculator gets you
-					calories, full macros, and 20+ micronutrients per serving in seconds — free, with no login.
+					calories, full macros, and 20+ micronutrients per serving in seconds - free, with no login.
 				</p>
 			</div>
 		</div>
@@ -213,7 +217,7 @@ const appStructuredData = {
 	</section>
 
 	<section class="max-w-[1400px] mx-auto px-md sm:px-lg pb-5xl">
-		<h2 class="text-display-lg text-ink mb-lg">Built around trust, not guesswork</h2>
+		<h2 class="text-display-lg text-ink mb-lg">Built around trust, not hidden guesswork</h2>
 		<div class="grid sm:grid-cols-2 gap-lg">
 			{
 				features.map((f) => (
@@ -230,7 +234,7 @@ const appStructuredData = {
 		<div class="rounded-lg bg-primary text-on-primary px-lg py-4xl text-center">
 			<p class="text-display-md">20+ micronutrients, calculated for every recipe.</p>
 			<p class="text-body-md opacity-70 mt-sm max-w-[520px] mx-auto">
-				Free and unlimited — no account, no paywalled results, ever.
+				Free and unlimited - no account, no paywalled results, ever.
 			</p>
 			<a
 				href="/how-it-works"
@@ -256,7 +260,7 @@ const appStructuredData = {
 				<p class="text-body-md text-body">
 					A recipe doesn't come with a nutrition label, so getting real numbers usually means looking up each
 					ingredient by hand and doing the math yourself. This recipe nutrition calculator does that work for
-					you: paste the whole ingredient list — or a URL, or a photo — and get calories, macros, and
+					you: paste the whole ingredient list - or a URL, or a photo - and get calories, macros, and
 					micronutrients for the entire dish, per serving, in one pass.
 				</p>
 			</div>
@@ -264,8 +268,7 @@ const appStructuredData = {
 			<div>
 				<h3 class="text-display-sm text-ink mb-xs">How ingredient matching works</h3>
 				<p class="text-body-md text-body">
-					Each line is parsed for quantity, unit, and ingredient name, then converted to a common weight —
-					cups and tablespoons use ingredient-specific density where we have it, not a generic assumption.
+					Each line is parsed for quantity, unit, and ingredient name, then converted to a common weight - 					cups and tablespoons use ingredient-specific density where we have it, not a generic assumption.
 					The ingredient is then matched against a curated, USDA-derived database. A low-confidence match is
 					labeled on the line, and anything we can't match at all falls back to an AI estimate rather than
 					being silently skipped.
@@ -277,7 +280,7 @@ const appStructuredData = {
 				<p class="text-body-md text-body">
 					Plenty of tools call themselves a free recipe calorie calculator right up until the results page,
 					then meter how many calculations you get or paywall the micronutrient detail. There's none of that
-					here — every recipe you run through gets the full breakdown, and every result comes with a
+					here - every recipe you run through gets the full breakdown, and every result comes with a
 					shareable link, automatically, with no account required to generate or view it.
 				</p>
 			</div>
@@ -287,7 +290,7 @@ const appStructuredData = {
 				<p class="text-body-md text-body">
 					Home cooks logging a homemade meal, meal-preppers who need an accurate per-serving count before
 					portioning containers, anyone watching sodium or sugar for a health condition, and recipe bloggers
-					who need nutrition facts for a post all use the same tool the same way — paste it in, get the
+					who need nutrition facts for a post all use the same tool the same way - paste it in, get the
 					numbers, share the link if you need to.
 				</p>
 			</div>

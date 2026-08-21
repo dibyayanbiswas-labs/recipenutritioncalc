@@ -5,7 +5,7 @@ import Card from '../components/ui/Card.astro';
 ---
 
 <Layout
-	title="How It Works — Recipe Nutrition Calculator"
+	title="How It Works - Recipe Nutrition Calculator"
 	description="See how this recipe nutrition calculator parses ingredients, converts units to grams, matches a USDA-derived database, and calculates calories and macros per serving."
 >
 	<section class="max-w-[760px] mx-auto px-md sm:px-lg py-3xl space-y-lg">
@@ -21,7 +21,7 @@ import Card from '../components/ui/Card.astro';
 			<h2 class="text-display-sm text-ink mb-xs">Where the nutrition data comes from</h2>
 			<p class="text-body-md text-body">
 				Nutrition values come from a curated database of common ingredients, built from public-domain USDA
-				reference data. It's not a live lookup against the full USDA database — it's a focused set covering
+				reference data. It's not a live lookup against the full USDA database - it's a focused set covering
 				the ingredients that show up in the vast majority of home recipes. If an ingredient isn't in our
 				database, we fall back to a generic estimate and flag it clearly as{' '}
 				<strong>approximate</strong> rather than guessing silently.
@@ -32,10 +32,10 @@ import Card from '../components/ui/Card.astro';
 			<h2 class="text-display-sm text-ink mb-xs">How we parse your recipe</h2>
 			<p class="text-body-md text-body">
 				Pasted text (and photo transcriptions) are split into ingredient lines and parsed for quantity, unit,
-				and ingredient name — handling fractions, ranges, and common unit abbreviations. Each ingredient name
+				and ingredient name - handling fractions, ranges, and common unit abbreviations. Each ingredient name
 				is then matched against our database using word-overlap scoring. A low-confidence match is shown as{' '}
 				<strong>low-confidence</strong> on the ingredient line so you know to double-check it. If an ingredient
-				isn't in our database at all, we ask an AI model for a best-guess estimate rather than skipping it —
+				isn't in our database at all, we ask an AI model for a best-guess estimate rather than skipping it -
 				those lines are clearly marked <strong>AI-estimated</strong>, since that number isn't sourced from
 				verified nutrition data.
 			</p>
@@ -45,7 +45,7 @@ import Card from '../components/ui/Card.astro';
 			<h2 class="text-display-sm text-ink mb-xs">How units convert to grams</h2>
 			<p class="text-body-md text-body">
 				Weight units (grams, ounces, pounds) convert directly. Volume units (cups, tablespoons) use an
-				ingredient-specific density where we have one — flour and water don't weigh the same per cup — and
+				ingredient-specific density where we have one - flour and water don't weigh the same per cup - and
 				count units ("2 eggs", "1 onion") use an average weight for that ingredient where known. When we
 				don't have ingredient-specific data, we fall back to water's density for volume or a generic
 				per-item weight for counts, and mark that line <strong>approximate</strong>.
@@ -58,9 +58,9 @@ import Card from '../components/ui/Card.astro';
 				<div>
 					<h3 class="text-body-md-strong text-ink mb-xxs">Paste text</h3>
 					<p class="text-body-md text-body">
-						One ingredient per line, written as <strong>quantity, unit, name</strong> — e.g.{' '}
+						One ingredient per line, written as <strong>quantity, unit, name</strong> - e.g.{' '}
 						<span class="font-mono">2 cups flour</span> or <span class="font-mono">1 lb chicken breast</span>.
-						Combining two ingredients on one line is the most common cause of a wrong result — calculation
+						Combining two ingredients on one line is the most common cause of a wrong result - calculation
 						happens as soon as you submit, with no review step in between, so it's worth getting the
 						format right first.
 					</p>
@@ -77,17 +77,17 @@ import Card from '../components/ui/Card.astro';
 					<h3 class="text-body-md-strong text-ink mb-xxs">URL import</h3>
 					<p class="text-body-md text-body">
 						We look for the structured "Recipe" data (schema.org JSON-LD) that most recipe sites embed for
-						Google's recipe search results — so the URL needs to point straight at one recipe's page, not a
+						Google's recipe search results - so the URL needs to point straight at one recipe's page, not a
 						homepage, category page, or roundup of several recipes. If a site doesn't publish that data,
 						URL import won't work for it. Some sites also block automated requests outright (you may see a
-						"couldn't fetch that page" error) even when they do publish the data — if that happens, open
+						"couldn't fetch that page" error) even when they do publish the data - if that happens, open
 						the page yourself and paste the ingredients directly instead.
 					</p>
 				</div>
 				<div>
 					<h3 class="text-body-md-strong text-ink mb-xxs">Photo upload</h3>
 					<p class="text-body-md text-body">
-						Photograph the ingredient list itself — a recipe card, cookbook page, or printout — not the
+						Photograph the ingredient list itself - a recipe card, cookbook page, or printout - not the
 						finished dish. Printed text transcribes most reliably; keep the shot in focus, well-lit, and
 						free of glare. You'll review the transcribed text and can fix any misread lines before
 						calculating.

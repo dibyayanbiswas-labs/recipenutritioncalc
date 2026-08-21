@@ -5,7 +5,7 @@ import Layout from '../layouts/Layout.astro';
 const faqs = [
 	{
 		q: 'Is this recipe nutrition calculator really free?',
-		a: 'Yes — pasting ingredients, importing a URL, uploading a photo, and the full macro and micronutrient breakdown are all free, with no account and no paywalled results.',
+		a: 'Yes - pasting ingredients, importing a URL, uploading a photo, and the full macro and micronutrient breakdown are all free, with no account and no paywalled results.',
 	},
 	{
 		q: 'How accurate is this recipe calorie calculator?',
@@ -13,11 +13,11 @@ const faqs = [
 	},
 	{
 		q: 'Can I use it as an online recipe nutrition calculator for any recipe?',
-		a: 'Yes — paste ingredient text, drop in a link to a recipe page with structured recipe data, or upload a photo of a printed or handwritten list. It works for homemade recipes and ones copied from anywhere on the web.',
+		a: 'Yes - paste ingredient text, drop in a link to a recipe page with structured recipe data, or upload a photo of a printed or handwritten list. It works for homemade recipes and ones copied from anywhere on the web.',
 	},
 	{
 		q: 'Do I need to install an app?',
-		a: 'No — it runs in your browser at recipenutritioncalc.com. Add it to your home screen for one-tap access if you want an app-like feel, without an app-store install.',
+		a: 'No - it runs in your browser at recipenutritioncalc.com. You can optionally add it to your home screen or dock for one-tap access, without an app-store install: on Android (Chrome), tap the ⋮ menu → Add to Home Screen; on iPhone (Safari), tap Share → Add to Home Screen; on desktop (Chrome/Edge), click the install icon in the address bar.',
 	},
 	{
 		q: 'How is this different from a calculator that only shows calories?',
@@ -29,19 +29,19 @@ const faqs = [
 	},
 	{
 		q: 'Can I take a picture of a recipe and get its nutrition?',
-		a: 'Yes — upload a photo of a printed or handwritten recipe and it\'s transcribed and parsed the same way as pasted text, then run through the same database matching and calculation.',
+		a: 'Yes - upload a photo of a printed or handwritten recipe and it\'s transcribed and parsed the same way as pasted text, then run through the same database matching and calculation.',
 	},
 	{
 		q: 'What kind of photo should I upload?',
-		a: 'Photograph the ingredient list itself — a recipe card, cookbook page, or printout — not the finished dish. Printed text is read most reliably; keep the shot in focus, well-lit, and free of glare so the transcription comes out clean. You\'ll get to review and fix the transcribed text before anything is calculated.',
+		a: 'Photograph the ingredient list itself - a recipe card, cookbook page, or printout - not the finished dish. Printed text is read most reliably; keep the shot in focus, well-lit, and free of glare so the transcription comes out clean. You\'ll get to review and fix the transcribed text before anything is calculated.',
 	},
 	{
-		q: 'What kind of URL should I paste — why do some recipe links fail?',
-		a: 'Use the URL of the specific recipe page itself, not a site\'s homepage, category page, or a roundup listing multiple recipes. We look for the structured recipe data most recipe sites embed for Google\'s recipe search results — if a page doesn\'t have it, the import won\'t work. Some sites also block automated requests outright (you may see a "couldn\'t fetch that page" error) even when they do publish that data. Either way, open the page yourself, copy the ingredient list, and use Paste text instead.',
+		q: 'What kind of URL should I paste - why do some recipe links fail?',
+		a: 'Use the URL of the specific recipe page itself, not a site\'s homepage, category page, or a roundup listing multiple recipes. We look for the structured recipe data most recipe sites embed for Google\'s recipe search results - if a page doesn\'t have it, the import won\'t work. Some sites also block automated requests outright (you may see a "couldn\'t fetch that page" error) even when they do publish that data. Either way, open the page yourself, copy the ingredient list, and use Paste text instead.',
 	},
 	{
 		q: 'What format should I paste my ingredients in?',
-		a: 'One ingredient per line, as quantity, unit, then name — e.g. "2 cups flour" or "1 lb chicken breast". Putting two ingredients on one line is the most common cause of a wrong result, so double-check the format before you submit — calculation happens immediately, with no review step in between.',
+		a: 'One ingredient per line, as quantity, unit, then name - e.g. "2 cups flour" or "1 lb chicken breast". Putting two ingredients on one line is the most common cause of a wrong result, so double-check the format before you submit - calculation happens immediately, with no review step in between.',
 	},
 	{
 		q: 'Is this completely AI calculated?',
@@ -49,7 +49,7 @@ const faqs = [
 	},
 	{
 		q: 'How will this help me?',
-		a: 'It gives you an accurate per-serving nutrition breakdown in seconds instead of manually looking up and summing each ingredient — useful for portioning meal prep, tracking sodium or sugar, or adding nutrition facts to a recipe post.',
+		a: 'It gives you an accurate per-serving nutrition breakdown in seconds instead of manually looking up and summing each ingredient - useful for portioning meal prep, tracking sodium or sugar, or adding nutrition facts to a recipe post.',
 	},
 ];
 
@@ -74,7 +74,7 @@ const faqsWithSlug = faqs.map((f) => ({ ...f, slug: slugify(f.q) }));
 ---
 
 <Layout
-	title="FAQ — Recipe Nutrition Calculator"
+	title="FAQ - Recipe Nutrition Calculator"
 	description="Answers to common questions about the free recipe nutrition calculator: accuracy, pricing, photo uploads, and how nutrition is calculated."
 	structuredData={[faqStructuredData]}
 >

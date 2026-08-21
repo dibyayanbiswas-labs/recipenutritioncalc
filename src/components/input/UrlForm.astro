@@ -22,7 +22,7 @@ const { error = null, servingsError = null, value = '' } = Astro.props;
 			aria-controls="url-format-info-panel"
 			class="flex items-center gap-xxs text-left text-caption text-mute mb-sm"
 		>
-			<span>Link straight to the recipe page itself — not the site's homepage or a search results page.</span>
+			<span>Link straight to the recipe page itself - not the site's homepage or a search results page.</span>
 			<span class="text-link underline shrink-0">See examples</span>
 		</button>
 		<div
@@ -30,9 +30,9 @@ const { error = null, servingsError = null, value = '' } = Astro.props;
 			role="note"
 			class="hidden text-caption text-body bg-canvas-soft-2 border border-hairline rounded-sm p-sm mb-xs space-y-xxs"
 		>
-			<p><strong class="text-ink">Use the exact page for one recipe</strong>, e.g. <span class="font-mono">https://example.com/recipes/chicken-curry</span> — not the homepage, a category page, or a roundup listing several recipes.</p>
+			<p><strong class="text-ink">Use the exact page for one recipe</strong>, e.g. <span class="font-mono">https://example.com/recipes/chicken-curry</span> - not the homepage, a category page, or a roundup listing several recipes.</p>
 			<p>We look for the structured recipe data most recipe blogs and major recipe sites embed (the same data Google uses for recipe search results). Not every site publishes it.</p>
-			<p>Some sites block automated requests outright, even when they do publish that data — you may see a "Couldn't fetch that page" error. If that happens, open the page yourself, copy the ingredient list, and use Paste text instead.</p>
+			<p>Some sites block automated requests outright, even when they do publish that data - you may see a "Couldn't fetch that page" error. If that happens, open the page yourself, copy the ingredient list, and use Paste text instead.</p>
 		</div>
 		<Input id="recipe-url" name="url" type="url" required placeholder="https://example.com/my-recipe" value={value} />
 		{error && <p class="text-body-sm text-error-deep mt-xxs">{error}</p>}

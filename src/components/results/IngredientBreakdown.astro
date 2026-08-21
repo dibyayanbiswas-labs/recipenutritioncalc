@@ -10,8 +10,8 @@ const { ingredients } = Astro.props;
 
 function matchLabel(ing: IngredientResult): string {
 	if (ing.matchedName) return `Matched: ${ing.matchedName}`;
-	if (ing.matchConfidence === 'ai-estimated') return 'Not in our database — estimated by AI';
-	return 'No match found — using a generic estimate';
+	if (ing.matchConfidence === 'ai-estimated') return 'Not in our database - estimated by AI';
+	return 'No match found - using a generic estimate';
 }
 ---
 
@@ -29,13 +29,13 @@ function matchLabel(ing: IngredientResult): string {
 				<div class="flex flex-col items-end gap-xxs shrink-0">
 					<span class="text-body-sm text-ink">{Math.round(ing.nutrients.kcal)} kcal</span>
 					{ing.quantity === null && !ing.isOptionalOrToTaste && (
-							<Badge tone="warning">Amount not recognized — assumed 1</Badge>
+							<Badge tone="warning">Amount not recognized - assumed 1</Badge>
 						)}
 						{ing.conversionSource === 'estimated' && <Badge tone="warning">Approximate</Badge>}
 					{ing.matchConfidence === 'low' && <Badge tone="warning">Low-confidence match</Badge>}
 					{ing.matchConfidence === 'ai-estimated' && <Badge tone="info">AI-estimated</Badge>}
 					{ing.matchConfidence === 'none' && <Badge tone="error">No match</Badge>}
-					{ing.ambiguous && <Badge tone="warning">Ambiguous — please verify</Badge>}
+					{ing.ambiguous && <Badge tone="warning">Ambiguous - please verify</Badge>}
 				</div>
 			</div>
 		))

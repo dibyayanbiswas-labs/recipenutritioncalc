@@ -12,7 +12,7 @@ import Button from '../ui/Button.astro';
 			aria-controls="photo-format-info-panel"
 			class="flex items-center gap-xxs text-left text-caption text-mute mb-sm"
 		>
-			<span>Photograph the ingredient list itself, in focus and well-lit — not a photo of the finished dish.</span>
+			<span>Photograph the ingredient list itself, in focus and well-lit - not a photo of the finished dish.</span>
 			<span class="text-link underline shrink-0">See examples</span>
 		</button>
 		<div
@@ -20,9 +20,9 @@ import Button from '../ui/Button.astro';
 			role="note"
 			class="hidden text-caption text-body bg-canvas-soft-2 border border-hairline rounded-sm p-sm mb-xs space-y-xxs"
 		>
-			<p><strong class="text-ink">Frame just the ingredients section</strong> — a cookbook page, recipe card, or printout, not the whole recipe card from a distance and not a photo of the cooked meal.</p>
+			<p><strong class="text-ink">Frame just the ingredients section</strong> - a cookbook page, recipe card, or printout, not the whole recipe card from a distance and not a photo of the cooked meal.</p>
 			<p>Printed text is read most reliably. Legible handwriting works too, but the less clear it is, the more you'll need to fix in the review step.</p>
-			<p>Avoid glare, blur, and steep angles — straight-on and well-lit gets the best transcription.</p>
+			<p>Avoid glare, blur, and steep angles - straight-on and well-lit gets the best transcription.</p>
 			<p class="text-mute">You'll get a chance to review the transcribed text (and fix anything misread) before we calculate.</p>
 		</div>
 		<input
@@ -141,7 +141,7 @@ import Button from '../ui/Button.astro';
 		try {
 			const prepared = await prepareImageForUpload(file);
 			if (prepared.size > MAX_UPLOAD_BYTES) {
-				errorEl.textContent = "That photo is too large even after compression — try cropping it to just the ingredient list, or paste the ingredients instead.";
+				errorEl.textContent = "That photo is too large even after compression - try cropping it to just the ingredient list, or paste the ingredients instead.";
 				errorEl.classList.remove('hidden');
 				return;
 			}
