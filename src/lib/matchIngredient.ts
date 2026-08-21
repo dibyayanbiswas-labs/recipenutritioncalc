@@ -234,6 +234,23 @@ const PASTA_SHAPE_WORDS = new Set([
 	'tagliatelle',
 	'orzo',
 ]);
+const SKIN_ONLY_PENALTY = 0.6;
+// "Potatoes, raw, skin" (and its baked/boiled/microwaved siblings) is the peel-only sub-item — a
+// meaningfully different, lower-calorie food than a whole potato — but its short name and bare
+// "potatoes" alias let it silently outscore the correct "flesh and skin"/"without skin" entries for a
+// plain "potato" query, which nobody means as "just the peel". Detected by position rather than a
+// simple word-penalty set (like UNCOMMON_VARIANT_WORDS above) because "skin" alone is ambiguous: it
+// means "peel only" here, but means "the normal whole food, skin included" for the many apple/chicken/
+// pork/fish entries elsewhere in the database ("apples, red delicious, with skin, raw") — so a blanket
+// penalty on the word "skin" would wrongly demote those. "without skin" (skin removed, i.e. flesh only)
+// is excluded the same way; only a bare, standalone "skin" qualifier with no "flesh"/"meat" alongside
+// it is treated as peel-only.
+function isPotatoSkinOnlyEntry(orderedTokens: string[]): boolean {
+	if (!orderedTokens.includes('potato') || !orderedTokens.includes('skin')) return false;
+	if (orderedTokens.includes('flesh') || orderedTokens.includes('meat')) return false;
+	const skinIndex = orderedTokens.indexOf('skin');
+	return orderedTokens[skinIndex - 1] !== 'without';
+}
 // Substitute-product words that need SUBSTITUTE_PRODUCT_PENALTY rather than UNCOMMON_VARIANT_PENALTY —
 // split out from the set above because these particular substitutes are disproportionately likely to
 // BE an entry's entire primary (pre-comma) segment ("bacon, meatless"; "mayonnaise, made with tofu";
@@ -503,11 +520,14 @@ export function matchIngredient(name: string, region?: RegionCode): IngredientMa
 		// leaving "spices, pepper, white" to win over "spices, pepper, black" for no good reason.
 		const isBarePepperBlackException =
 			queryTokens.size === 1 && queryTokens.has('pepper') && nameTokens.has('black') && entryPrimaryCategory[entryIndex] === 'spices';
+		const isSkinOnlyPotato =
+			isPotatoSkinOnlyEntry(entryNameTokensOrdered[entryIndex]) && !queryTokens.has('skin') && !queryTokens.has('peel');
 
 		const isOffType =
 			(hasCookedWord && !queryHasCookedWord) ||
 			(hasUncommonVariantWord && !isBarePepperBlackException && ![...queryTokens].some((t) => UNCOMMON_VARIANT_WORDS.has(t))) ||
 			(hasFlavorAdditiveWord && ![...queryTokens].some((t) => FLAVOR_ADDITIVE_WORDS.has(t))) ||
+			isSkinOnlyPotato ||
 			(hasProcessedFormWord && ![...queryTokens].some((t) => PROCESSED_FORM_WORDS.has(t))) ||
 			(hasNamedDishWord && ![...queryTokens].some((t) => NAMED_DISH_WORDS.has(t))) ||
 			(hasConcentrateWord && !queryHasConcentrateWord) ||
@@ -549,6 +569,9 @@ export function matchIngredient(name: string, region?: RegionCode): IngredientMa
 		}
 		if (hasFlavorAdditiveWord && ![...queryTokens].some((t) => FLAVOR_ADDITIVE_WORDS.has(t))) {
 			rankScore -= UNCOMMON_VARIANT_PENALTY;
+		}
+		if (isSkinOnlyPotato) {
+			rankScore -= SKIN_ONLY_PENALTY;
 		}
 		if (hasProcessedFormWord && ![...queryTokens].some((t) => PROCESSED_FORM_WORDS.has(t))) {
 			rankScore -= UNCOMMON_VARIANT_PENALTY;

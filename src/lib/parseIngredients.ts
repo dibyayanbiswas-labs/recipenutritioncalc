@@ -706,5 +706,21 @@ export function checkIngredientTextFormat(text: string): FormatCheckResult {
 		};
 	}
 
+	// A quantity this large on a single ingredient line is essentially always a typo or a misread
+	// unit/quantity split (e.g. "1000mg" parsed as "1000" of a unit meant to be tiny) rather than a
+	// genuine recipe amount — flagged as a non-blocking warning, the same way a mostly-unparsed paste
+	// is, rather than silently producing an enormous, misleading total.
+	const IMPLAUSIBLE_QUANTITY = 1000;
+	const implausible = lines.filter(
+		(l) => (l.quantity !== null && l.quantity >= IMPLAUSIBLE_QUANTITY) || (l.quantityRange !== null && l.quantityRange[1] >= IMPLAUSIBLE_QUANTITY),
+	);
+	if (implausible.length > 0) {
+		return {
+			ok: false,
+			reason: 'One or more lines have an unusually large amount — double-check those quantities before trusting the result.',
+			unparsedExamples: implausible.slice(0, 3).map((l) => l.raw),
+		};
+	}
+
 	return { ok: true };
 }
