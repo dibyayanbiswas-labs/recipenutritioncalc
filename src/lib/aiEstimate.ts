@@ -1,4 +1,5 @@
 import type { NutrientProfile } from './matchIngredient';
+import type { AiCallBudget } from './unitConversion';
 
 // A small, cheap instruct model — this is a short structured-JSON task, not the vision OCR path,
 // so it doesn't need a large model. @cf/meta/llama-3.1-8b-instruct was deprecated 2026-05-30 (error
@@ -14,7 +15,9 @@ const CORE_KEYS = ['kcal', 'protein_g', 'fat_g', 'satFat_g', 'carbs_g', 'fiber_g
 // (see scaleProfile's `?? 0`) — better than every AI-estimated ingredient (e.g. an organ meat like
 // liver, or anything else the local database has no entry for) silently reading as containing zero
 // vitamin A/B12/etc. regardless of what the actual food is.
-const OPTIONAL_KEYS = [
+// Exported so callers (nutrients.ts) can check which of these a real database entry is missing,
+// to enrich it via the same estimate this module already produces — see enrichMissingNutrients.
+export const OPTIONAL_KEYS = [
 	'vitaminA_mcg',
 	'vitaminC_mg',
 	'vitaminD_mcg',
@@ -148,4 +151,42 @@ export async function estimateNutritionWithAI(ingredientName: string, ai: Ai, kv
 		console.error('estimateNutritionWithAI: Workers AI call failed', err);
 		return null;
 	}
+}
+
+/** Fills in vitamin/mineral fields a *real, matched* database entry is genuinely missing (the key is
+ * absent from its per100g data, not just zero — a real zero stays a real zero) using the same
+ * estimate/cache/retry machinery as an unmatched ingredient, keyed by the entry's own canonical name
+ * so every recipe that matches this entry shares one cached enrichment instead of paying per-recipe.
+ * Core macro fields and any optional field the entry already has are never touched — this only ever
+ * adds what wasn't there. Draws from the shared per-request budget; returns the entry's own per100g
+ * unchanged if nothing's missing, the budget is exhausted, or no AI context is available. */
+export async function enrichMissingNutrients(
+	entryName: string,
+	per100g: NutrientProfile,
+	ai?: Ai,
+	kv?: KVNamespace,
+	budget?: AiCallBudget,
+): Promise<NutrientProfile> {
+	const missingKeys = OPTIONAL_KEYS.filter((key) => !(key in per100g));
+	if (missingKeys.length === 0 || !ai) return per100g;
+
+	// Cache lookup is free (no Neurons spent) and doesn't touch the call budget — only an actual model
+	// call does, checked and consumed after the cache miss below. Same "ai-estimate:" cache namespace
+	// as estimateNutritionWithAI's own per-ingredient cache — deliberately: whichever call happens to
+	// run first for a given name (this entry's canonical name, or an unmatched ingredient that
+	// happens to share the exact same text) populates it for both.
+	let estimate = kv ? await getCachedEstimate(entryName, kv) : null;
+	if (!estimate) {
+		if (!budget || budget.calls <= 0) return per100g;
+		budget.calls--;
+		estimate = await estimateNutritionWithAI(entryName, ai, kv);
+	}
+	if (!estimate) return per100g;
+
+	const enriched = { ...per100g };
+	for (const key of missingKeys) {
+		const value = estimate[key];
+		if (typeof value === 'number' && Number.isFinite(value)) enriched[key] = value;
+	}
+	return enriched;
 }

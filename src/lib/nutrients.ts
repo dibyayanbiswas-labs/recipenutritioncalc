@@ -2,7 +2,7 @@ import { matchIngredient, type MatchConfidence, type NutrientProfile } from './m
 import { parseIngredients, type ParsedIngredientLine } from './parseIngredients';
 import { resolveGrams, type AiCallBudget, type ConversionSource } from './unitConversion';
 import { unionAllergens } from './allergens';
-import { estimateNutritionWithAI, getCachedEstimate } from './aiEstimate';
+import { enrichMissingNutrients, estimateNutritionWithAI, getCachedEstimate } from './aiEstimate';
 import {
 	DAILY_VALUES,
 	type HealthScore,
@@ -94,7 +94,12 @@ export async function analyzeIngredientLines(lines: ParsedIngredientLine[], ai?:
 			}
 
 			const { grams, conversionSource } = await resolveGrams(line, entry, ai ? { ai, kv, budget } : undefined);
-			const nutrients = entry ? scaleProfile(entry.per100g, grams) : aiProfile ? scaleProfile(aiProfile, grams) : emptyProfile();
+			// A real database match can still be missing specific vitamin/mineral fields (a known,
+			// widespread gap in the bundled data — see enrichMissingNutrients) — fill those in the same
+			// way an unmatched ingredient's whole profile gets estimated, without touching the entry's
+			// own real macro data.
+			const effectivePer100g = entry ? await enrichMissingNutrients(entry.name, entry.per100g, ai, kv, budget) : null;
+			const nutrients = effectivePer100g ? scaleProfile(effectivePer100g, grams) : aiProfile ? scaleProfile(aiProfile, grams) : emptyProfile();
 
 			return {
 				raw: line.raw,

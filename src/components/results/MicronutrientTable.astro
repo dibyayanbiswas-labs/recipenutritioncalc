@@ -1,6 +1,7 @@
 ---
 import type { NutrientProfile } from '../../lib/matchIngredient';
 import { MICRO_META } from '../../lib/nutrientMeta';
+import { LOW_COVERAGE_NUTRIENT_KEYS } from '../../lib/nutrientMath';
 import DVBar from './DVBar.astro';
 
 interface Props {
@@ -30,6 +31,7 @@ const columns = [MICRO_META.slice(0, mid), MICRO_META.slice(mid)];
 							unit={m.unit}
 							percent={dailyValuePercent[m.key] ?? 0}
 							nutrientKey={m.key}
+							notTracked={LOW_COVERAGE_NUTRIENT_KEYS.has(m.key as keyof NutrientProfile)}
 						/>
 					))}
 				</div>

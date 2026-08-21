@@ -106,6 +106,10 @@ const totalsJson = JSON.stringify(result.totals).replace(/</g, '\\u003c');
 
 	<Card variant="marketing">
 		<IngredientBreakdown ingredients={result.ingredients} />
+		<p class="text-caption text-mute mt-md pt-md border-t border-hairline">
+			Values reflect each ingredient's matched raw or cooked state - actual nutrient content can vary somewhat
+			with cooking method. <a href="/how-it-works#raw-vs-cooked-ingredients" class="text-link hover:underline">Learn more</a>.
+		</p>
 	</Card>
 
 	<details class="group">

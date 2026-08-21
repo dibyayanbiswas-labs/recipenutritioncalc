@@ -1,5 +1,5 @@
 import dailyValuesData from '../data/dailyValues.json';
-import type { NutrientProfile } from './matchIngredient';
+import { INGREDIENTS, type NutrientProfile } from './matchIngredient';
 
 export const DAILY_VALUES = dailyValuesData as Record<string, number>;
 
@@ -9,6 +9,39 @@ export interface HealthScore {
 	score: number;
 	rationale: string[];
 }
+
+// A nutrient whose source data is present in only a handful of the bundled database's ~40,000 entries
+// (across all 5 regions) isn't a real "0% Daily Value" for whatever food that "0%" is attached to —
+// it's an absence of data being displayed as if it were a measurement. vitaminE_mg is the extreme case
+// (essentially unpopulated database-wide, so every food on the site would otherwise read as
+// containing literally none of it, which can't be true), but computed generically here rather than
+// hardcoded so this list self-corrects if the underlying data ever improves (e.g. via
+// enrichMissingNutrients backfilling real entries over time) instead of needing to be hand-maintained.
+// 5% is deliberately low — anything with genuinely partial-but-real coverage (most vitamins/minerals
+// are 20%+) should still show its real, if imperfect, number rather than being hidden.
+const LOW_COVERAGE_THRESHOLD = 0.05;
+
+// Coverage is measured against the US entries specifically, not the full combined 5-region set —
+// matchIngredient(name, 'US') biases every lookup toward US entries when one's available, so a food
+// blending all 5 regions together can look reasonably covered on average while what a US-biased match
+// actually lands on is nearly empty (this is exactly what happened with vitaminE_mg: ~0% in the US
+// data alone, but ~51% once UK/AU/CA/IN — which real matches mostly don't land on — are averaged in).
+function computeLowCoverageNutrientKeys(): Set<keyof NutrientProfile> {
+	const keys = NUTRIENT_KEYS.filter((k) => k !== 'kcal');
+	const low = new Set<keyof NutrientProfile>();
+	const usEntries = INGREDIENTS.filter((e) => e.region === 'US');
+	if (usEntries.length === 0) return low;
+	for (const key of keys) {
+		const present = usEntries.reduce((count, e) => count + (key in e.per100g ? 1 : 0), 0);
+		if (present / usEntries.length < LOW_COVERAGE_THRESHOLD) low.add(key);
+	}
+	return low;
+}
+
+/** Nutrients where the bundled database has essentially no real data at all — a UI showing one of
+ * these should say so rather than display a confident-looking "0%" (see the comment above). Computed
+ * once per Worker isolate, not per-request. */
+export const LOW_COVERAGE_NUTRIENT_KEYS: Set<keyof NutrientProfile> = computeLowCoverageNutrientKeys();
 
 export function emptyProfile(): NutrientProfile {
 	const p = {} as NutrientProfile;
