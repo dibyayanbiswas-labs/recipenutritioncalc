@@ -41,6 +41,9 @@ const tabs = [
 ---
 
 <div>
+	<p class="pwa-connectivity-note text-caption text-mute mb-sm">
+		Using the installed app? Stay connected to the internet — recipe analysis needs it for accurate results.
+	</p>
 	<div role="tablist" class="flex flex-wrap gap-xs mb-lg" id="input-tabs">
 		{
 			tabs.map((tab) => (
@@ -112,3 +115,17 @@ const tabs = [
 		window.activateInputTab = activate;
 	})();
 </script>
+
+<style>
+	/* Only relevant once installed — a browser tab has its own address bar for the
+	   user to notice connectivity, so keep this hidden there and only surface it
+	   when running standalone (installed PWA window). */
+	.pwa-connectivity-note {
+		display: none;
+	}
+	@media (display-mode: standalone) {
+		.pwa-connectivity-note {
+			display: block;
+		}
+	}
+</style>
