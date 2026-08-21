@@ -57,13 +57,16 @@ export function computeDailyValuePercent(perServing: NutrientProfile): Record<st
 // genuinely low across sugar/sodium/sat-fat AND rich in fiber/protein can actually reach 9-10, and one
 // that's extreme on a bad nutrient can actually reach 1-2, instead of every recipe being squeezed into
 // a 4-7 band by a formula that only ever moves by 1 point in each direction.
-// Label wording follows the same ≤5%=low / ≥20%=high FDA convention the bands themselves are built
-// on (21 CFR 101.9), rather than calling anything above the 5% floor "High" outright — a null label
-// means the tier moves the score but doesn't back a claim the FDA rule wouldn't itself support yet
-// (e.g. a 6.2%-DV nutrient is technically over the "low" floor but nowhere near "high").
+// Label wording mirrors GOOD_NUTRIENT_BANDS below rather than the FDA's raw ≥20%=high cutoff alone:
+// the 5-10% tier still moves the score (a small, silent nudge) but doesn't get a verbal claim, the
+// same way a nutrient at 5-10% DV earns a bonus point without being called a "Good source of" — a
+// nutrient just above the "low" floor shouldn't read as a called-out concern on one side of the score
+// while being treated as unremarkable on the other. First real claim ("Moderately high") starts at the
+// same 10% DV threshold FDA's own "good source" claim requires (21 CFR 101.54); "High" at 20%+ matches
+// FDA's own Nutrition Facts "high" cutoff (21 CFR 101.9).
 const BAD_NUTRIENT_BANDS: { maxDV: number; penalty: number; label: string | null }[] = [
 	{ maxDV: 5, penalty: 0, label: null },
-	{ maxDV: 10, penalty: 1, label: 'Elevated' },
+	{ maxDV: 10, penalty: 1, label: null },
 	{ maxDV: 20, penalty: 2, label: 'Moderately high' },
 	{ maxDV: 35, penalty: 3, label: 'High' },
 	{ maxDV: Infinity, penalty: 4, label: 'Very high' },
