@@ -336,7 +336,11 @@ const CONCENTRATE_PENALTY = 0.6;
 // real ingredient scores its own PRIMARY_MATCH_BONUS instead of losing to whichever prepared dish
 // (cookies, waffles, granola bars, ...) happens to have the fewest qualifier words that day — but it
 // still helps in the general case where no such entry exists and the honest answer is "no match".
-const NAMED_DISH_WORDS = new Set(['spanish', 'duchesse', 'toast', 'cookie']);
+// 'hopi' added: a bare "corn tortillas" query landed on "Tortilla, blue corn, sakwavikaviki (hopi)" —
+// a specific tribal recipe variant, not a plain corn tortilla — for the same reason 'spanish'/
+// 'duchesse' get demoted: its short name and comma-first "tortilla" segment out-scored the correct,
+// longer-named "tortillas, ready-to-bake or -fry, corn" entries.
+const NAMED_DISH_WORDS = new Set(['spanish', 'duchesse', 'toast', 'cookie', 'hopi']);
 
 // Salt-type descriptors that don't correspond to a distinct database entry — there's only ever one
 // "salt, table" entry, covering all of these culinarily-different-but-nutritionally-identical forms.
