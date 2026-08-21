@@ -11,8 +11,18 @@ export async function saveResult(kv: KVNamespace, result: NutritionResult): Prom
 	await kv.put(resultKey(result.id), JSON.stringify(result), { expirationTtl: RESULT_TTL_SECONDS });
 }
 
+/** Never throws: a KV read failure (e.g. the free plan's daily read quota) is treated the same as
+ * "not found" — both callers (src/pages/index.astro, src/pages/r/[id].astro) already have a clean
+ * fallback UX for a null result, which is far better than crashing the page into Astro's generic
+ * 500 error over what's likely a transient/quota issue. */
 export async function loadResult(kv: KVNamespace, id: string): Promise<NutritionResult | null> {
-	const raw = await kv.get(resultKey(id));
+	let raw: string | null;
+	try {
+		raw = await kv.get(resultKey(id));
+	} catch (err) {
+		console.error('loadResult: KV read failed', err);
+		return null;
+	}
 	if (!raw) return null;
 	try {
 		return JSON.parse(raw) as NutritionResult;

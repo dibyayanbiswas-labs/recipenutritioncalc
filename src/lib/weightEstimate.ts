@@ -42,13 +42,21 @@ function cacheKey(ingredientName: string, measureDescription: string): string {
 }
 
 /** Looks up a previously-cached weight estimate so a repeat ingredient+measure (e.g. across different
- * users' recipes) never has to spend a Workers AI call twice. */
+ * users' recipes) never has to spend a Workers AI call twice. Never throws: a KV read failure (e.g.
+ * the free plan's daily read quota) is treated the same as a cache miss rather than surfacing as a
+ * raw error to the caller. */
 export async function getCachedWeightEstimate(
 	ingredientName: string,
 	measureDescription: string,
 	kv: KVNamespace,
 ): Promise<number | null> {
-	const raw = await kv.get(cacheKey(ingredientName, measureDescription));
+	let raw: string | null;
+	try {
+		raw = await kv.get(cacheKey(ingredientName, measureDescription));
+	} catch (err) {
+		console.error('getCachedWeightEstimate: KV read failed', err);
+		return null;
+	}
 	if (raw === null) return null;
 	const n = Number(raw);
 	return Number.isFinite(n) ? n : null;

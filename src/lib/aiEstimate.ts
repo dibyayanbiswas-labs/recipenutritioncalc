@@ -95,9 +95,15 @@ function cacheKey(ingredientName: string): string {
 	return `ai-estimate:${ingredientName.trim().toLowerCase()}`;
 }
 
-/** Looks up a previously-cached AI estimate so a repeat ingredient (e.g. across different users' recipes) never has to spend a Workers AI call twice. */
+/** Looks up a previously-cached AI estimate so a repeat ingredient (e.g. across different users' recipes) never has to spend a Workers AI call twice. Never throws: a KV read failure (e.g. the free plan's daily read quota) is treated the same as a cache miss rather than surfacing as a raw error to the caller. */
 export async function getCachedEstimate(ingredientName: string, kv: KVNamespace): Promise<NutrientProfile | null> {
-	const raw = await kv.get(cacheKey(ingredientName));
+	let raw: string | null;
+	try {
+		raw = await kv.get(cacheKey(ingredientName));
+	} catch (err) {
+		console.error('getCachedEstimate: KV read failed', err);
+		return null;
+	}
 	if (!raw) return null;
 	try {
 		return JSON.parse(raw) as NutrientProfile;

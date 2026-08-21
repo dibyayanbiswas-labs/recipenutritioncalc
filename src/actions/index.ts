@@ -1,7 +1,7 @@
 import { defineAction, ActionError, type ActionAPIContext } from 'astro:actions';
 import { z } from 'astro/zod';
 import { env } from 'cloudflare:workers';
-import { analyzeIngredientLines, analyzeRecipeText, buildNutritionResult } from '../lib/nutrients';
+import { analyzeIngredientLines, analyzeRecipeText, buildNutritionResult, type NutritionResult } from '../lib/nutrients';
 import { checkIngredientTextFormat, parseIngredientLine } from '../lib/parseIngredients';
 import { extractRecipeFromUrl } from '../lib/schemaOrgRecipe';
 import { generateResultId, saveResult } from '../lib/kv';
@@ -39,6 +39,23 @@ async function requireUnderRateLimit(context: ActionAPIContext): Promise<void> {
 	}
 }
 
+/** Persists a finished result, turning any storage failure (e.g. the free KV plan's daily write
+ * quota being exhausted) into a clean, friendly message instead of Astro's default behavior for an
+ * uncaught error — sending its raw `.message` straight to the browser (see `callSafely` in Astro's
+ * action runtime). The real error is still logged server-side so `wrangler tail` shows what
+ * actually happened. */
+async function saveResultOrFail(result: NutritionResult): Promise<void> {
+	try {
+		await saveResult(env.RESULTS_KV, result);
+	} catch (err) {
+		console.error('saveResult: KV write failed', err);
+		throw new ActionError({
+			code: 'INTERNAL_SERVER_ERROR',
+			message: "We're experiencing high demand right now — please try again in a few minutes.",
+		});
+	}
+}
+
 export const server = {
 	analyzeText: defineAction({
 		accept: 'form',
@@ -71,7 +88,7 @@ export const server = {
 				kv: env.RESULTS_KV,
 				formatWarning: formatCheck.ok ? null : (formatCheck.reason ?? null),
 			});
-			await saveResult(env.RESULTS_KV, result);
+			await saveResultOrFail(result);
 			return result;
 		},
 	}),
@@ -119,7 +136,7 @@ export const server = {
 					? "This recipe's source page lists its yield as 1 — that's often a whole dish (e.g. \"1 loaf\" or \"1 batch\"), not a single serving. Double-check and adjust the servings count if needed."
 					: null,
 			});
-			await saveResult(env.RESULTS_KV, result);
+			await saveResultOrFail(result);
 			return result;
 		},
 	}),
@@ -156,7 +173,7 @@ export const server = {
 				ingredients,
 				createdAt: Date.now(),
 			});
-			await saveResult(env.RESULTS_KV, result);
+			await saveResultOrFail(result);
 			return result;
 		},
 	}),
