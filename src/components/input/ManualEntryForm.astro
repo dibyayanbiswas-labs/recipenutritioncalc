@@ -93,12 +93,21 @@ const { error = null, servingsError = null } = Astro.props;
 
 <script>
 	import { clearSavedInput } from '../../lib/clearSavedInputs';
+	import { showCalculating } from '../../lib/formLoadingState';
 
+	const form = document.getElementById('manual-form') as HTMLFormElement | null;
 	const rowsContainer = document.getElementById('manual-rows')!;
 	const template = document.getElementById('row-template') as HTMLTemplateElement;
 	const addRowBtn = document.getElementById('add-row')!;
 	const titleInput = document.getElementById('manual-title') as HTMLInputElement | null;
 	const servingsInput = document.getElementById('manual-servings') as HTMLInputElement | null;
+	const submitBtn = document.getElementById('manual-submit') as HTMLButtonElement | null;
+	const startOverBtn = document.getElementById('manual-start-over') as HTMLButtonElement | null;
+
+	form?.addEventListener('submit', () => {
+		showCalculating(submitBtn, 'Calculating nutrition…');
+		if (startOverBtn) startOverBtn.disabled = true;
+	});
 
 	const manualInfoToggle = document.getElementById('manual-format-info-toggle');
 	const manualInfoPanel = document.getElementById('manual-format-info-panel');
@@ -155,7 +164,7 @@ const { error = null, servingsError = null } = Astro.props;
 		if (saved) titleInput.value = saved;
 	}
 
-	document.getElementById('manual-start-over')?.addEventListener('click', () => {
+	startOverBtn?.addEventListener('click', () => {
 		rowsContainer.innerHTML = '';
 		appendRow();
 		if (titleInput) titleInput.value = '';

@@ -89,12 +89,15 @@ const EXAMPLE_PLACEHOLDER = '1 lb chicken breast\n2 cups all-purpose flour\n1 ts
 <script>
 	import { checkIngredientTextFormat } from '../../lib/parseIngredients';
 	import { clearSavedInput } from '../../lib/clearSavedInputs';
+	import { showCalculating } from '../../lib/formLoadingState';
 
 	const form = document.getElementById('paste-form') as HTMLFormElement | null;
 	const textarea = document.getElementById('ingredient-textarea') as HTMLTextAreaElement | null;
 	const errorEl = document.getElementById('paste-format-error');
 	const titleInput = document.getElementById('paste-title') as HTMLInputElement | null;
 	const servingsInput = document.getElementById('paste-servings') as HTMLInputElement | null;
+	const primaryBtn = document.getElementById('paste-primary-btn') as HTMLButtonElement | null;
+	const startOverBtn = document.getElementById('paste-start-over') as HTMLButtonElement | null;
 
 	const infoToggle = document.getElementById('format-info-toggle');
 	const infoPanel = document.getElementById('format-info-panel');
@@ -130,6 +133,8 @@ const EXAMPLE_PLACEHOLDER = '1 lb chicken breast\n2 cups all-purpose flour\n1 ts
 			return;
 		}
 		errorEl?.classList.add('hidden');
+		showCalculating(primaryBtn, 'Calculating nutrition…');
+		if (startOverBtn) startOverBtn.disabled = true;
 	});
 </script>
 

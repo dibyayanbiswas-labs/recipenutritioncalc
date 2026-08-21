@@ -12,7 +12,7 @@ interface Props {
 const { error = null, servingsError = null, value = '' } = Astro.props;
 ---
 
-<form method="POST" action={actions.analyzeUrl} class="space-y-md">
+<form id="url-form" method="POST" action={actions.analyzeUrl} class="space-y-md">
 	<div>
 		<label for="recipe-url" class="text-body-sm-strong text-ink block mb-xxs">Recipe URL</label>
 		<button
@@ -43,16 +43,25 @@ const { error = null, servingsError = null, value = '' } = Astro.props;
 		{servingsError && <p class="text-body-sm text-error-deep mt-xxs">{servingsError}</p>}
 	</div>
 	<div class="flex items-center gap-md">
-		<Button type="submit">Fetch &amp; calculate</Button>
+		<Button type="submit" id="url-submit-btn">Fetch &amp; calculate</Button>
 		<Button type="button" id="url-start-over" variant="secondary">Start over</Button>
 	</div>
 </form>
 
 <script>
 	import { clearSavedInput } from '../../lib/clearSavedInputs';
+	import { showCalculating } from '../../lib/formLoadingState';
 
+	const form = document.getElementById('url-form') as HTMLFormElement | null;
 	const urlInput = document.getElementById('recipe-url') as HTMLInputElement | null;
 	const servingsInput = document.getElementById('url-servings') as HTMLInputElement | null;
+	const submitBtn = document.getElementById('url-submit-btn') as HTMLButtonElement | null;
+	const startOverBtn = document.getElementById('url-start-over') as HTMLButtonElement | null;
+
+	form?.addEventListener('submit', () => {
+		showCalculating(submitBtn, 'Fetching & calculating…');
+		if (startOverBtn) startOverBtn.disabled = true;
+	});
 
 	const urlInfoToggle = document.getElementById('url-format-info-toggle');
 	const urlInfoPanel = document.getElementById('url-format-info-panel');
@@ -62,7 +71,7 @@ const { error = null, servingsError = null, value = '' } = Astro.props;
 		urlInfoToggle?.setAttribute('aria-expanded', String(!isOpen));
 	});
 
-	document.getElementById('url-start-over')?.addEventListener('click', () => {
+	startOverBtn?.addEventListener('click', () => {
 		if (urlInput) urlInput.value = '';
 		if (servingsInput) servingsInput.value = '';
 		clearSavedInput('recipeCalc:url');
