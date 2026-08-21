@@ -104,23 +104,42 @@ export async function getCachedEstimate(ingredientName: string, kv: KVNamespace)
 }
 
 // No expirationTtl: a food's per-100g nutrition doesn't change, so once estimated it can be reused
-// forever — this is what keeps repeat ingredients from costing Neurons more than once.
+// forever — this is what keeps repeat ingredients from costing Neurons more than once. Also why a bad
+// answer is worth a retry before it gets cached: it's stuck for every future user of that ingredient.
 async function cacheEstimate(ingredientName: string, kv: KVNamespace, profile: NutrientProfile): Promise<void> {
 	await kv.put(cacheKey(ingredientName), JSON.stringify(profile));
+}
+
+// A real food is essentially never zero across all 20 vitamin/mineral fields at once — even something
+// as plain as white rice has nonzero thiamin, magnesium, etc. All-zero is a much stronger signal that
+// the model phoned in a lazy completion for that call specifically than that the food genuinely has
+// none of any of them, and it's worth one retry before that answer gets locked into the cache forever.
+function hasAnyNonzeroOptional(profile: NutrientProfile): boolean {
+	return OPTIONAL_KEYS.some((key) => (profile[key] ?? 0) > 0);
+}
+
+async function runEstimate(ingredientName: string, ai: Ai): Promise<NutrientProfile | null> {
+	const result = (await ai.run(ESTIMATE_MODEL, {
+		messages: [{ role: 'user', content: buildPrompt(ingredientName) }],
+		// 256 was tuned for the original 8-field response; the vitamin/mineral fields roughly
+		// quadruple the JSON's key count, so this needs proportionally more room to avoid a response
+		// getting cut off mid-object and failing to parse.
+		max_tokens: 700,
+	})) as { response?: string | Record<string, unknown> };
+	if (!result.response) return null;
+	return parseResponse(result.response);
 }
 
 /** Asks Cloudflare Workers AI to estimate per-100g nutrition for an ingredient the local database couldn't match, caching the result in KV when available. Never throws — returns null on any failure so callers can fall back cleanly. */
 export async function estimateNutritionWithAI(ingredientName: string, ai: Ai, kv?: KVNamespace): Promise<NutrientProfile | null> {
 	try {
-		const result = (await ai.run(ESTIMATE_MODEL, {
-			messages: [{ role: 'user', content: buildPrompt(ingredientName) }],
-			// 256 was tuned for the original 8-field response; the vitamin/mineral fields roughly
-			// quadruple the JSON's key count, so this needs proportionally more room to avoid a
-			// response getting cut off mid-object and failing to parse.
-			max_tokens: 700,
-		})) as { response?: string | Record<string, unknown> };
-		if (!result.response) return null;
-		const profile = parseResponse(result.response);
+		let profile = await runEstimate(ingredientName, ai);
+		if (profile && !hasAnyNonzeroOptional(profile)) {
+			// Bounded to a single retry — if the second attempt is also all-zero, accept it rather than
+			// looping; a food that's genuinely all-zero is vanishingly rare but not impossible.
+			const retryProfile = await runEstimate(ingredientName, ai);
+			if (retryProfile && hasAnyNonzeroOptional(retryProfile)) profile = retryProfile;
+		}
 		if (profile && kv) await cacheEstimate(ingredientName, kv, profile);
 		return profile;
 	} catch (err) {
