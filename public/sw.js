@@ -1,6 +1,6 @@
 // Hand-written service worker (no build step / Workbox) — bump these version suffixes
 // whenever the caching strategy below changes, to force old caches to be dropped on activate.
-const STATIC_CACHE = 'rnc-static-v3';
+const STATIC_CACHE = 'rnc-static-v4';
 const PAGES_CACHE = 'rnc-pages-v1';
 
 const PRECACHE_URLS = [
@@ -12,6 +12,8 @@ const PRECACHE_URLS = [
 	'/apple-touch-icon.png',
 	'/web-app-manifest-192x192.png',
 	'/web-app-manifest-512x512.png',
+	'/web-app-manifest-192x192-maskable.png',
+	'/web-app-manifest-512x512-maskable.png',
 ];
 
 // Content-hashed build output (/_astro/*) — safe to cache-first since a changed file always

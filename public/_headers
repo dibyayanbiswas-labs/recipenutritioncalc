@@ -21,3 +21,9 @@
 
 /web-app-manifest-512x512.png
   Cache-Control: public, max-age=0, must-revalidate
+
+/web-app-manifest-192x192-maskable.png
+  Cache-Control: public, max-age=0, must-revalidate
+
+/web-app-manifest-512x512-maskable.png
+  Cache-Control: public, max-age=0, must-revalidate
