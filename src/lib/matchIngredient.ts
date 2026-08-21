@@ -251,6 +251,11 @@ function isPotatoSkinOnlyEntry(orderedTokens: string[]): boolean {
 	const skinIndex = orderedTokens.indexOf('skin');
 	return orderedTokens[skinIndex - 1] !== 'without';
 }
+// Large enough to overcome a US "sauce, ..." entry's REGION_MATCH_BONUS (0.3) plus the primary-match
+// bonus it gets from the CATEGORY_PREFIX_DENYLIST redirect, so a non-US plain-food entry (e.g. a CA
+// "Pasta, spaghetti, ..." dry-pasta entry, which carries no region bonus for a US-preferring query) can
+// still win over the sauce.
+const UNWANTED_SAUCE_PENALTY = 0.5;
 // Substitute-product words that need SUBSTITUTE_PRODUCT_PENALTY rather than UNCOMMON_VARIANT_PENALTY —
 // split out from the set above because these particular substitutes are disproportionately likely to
 // BE an entry's entire primary (pre-comma) segment ("bacon, meatless"; "mayonnaise, made with tofu";
@@ -420,14 +425,37 @@ const entryPrimaryTokens: Set<string>[] = INGREDIENTS.map((e) => {
 // Precomputed per-entry lowercased first segment — used for the bare-"pepper" tiebreak below.
 const entryPrimaryCategory: string[] = INGREDIENTS.map((e) => e.name.split(',')[0].trim().toLowerCase());
 const BARE_PEPPER_SPICE_BONUS = 0.3;
-// A bare "paneer" query means the plain cheese, but the one genuine entry ("Cheese, Paneer", UK data)
-// names itself category-first, so its primary segment is "cheese" and it gets no primary-match bonus at
-// all — while the IN database's 30+ prepared-dish entries that happen to literally start with the word
-// "Paneer" ("Paneer, apple and pineapple salad", "Paneer kofta curry", ...) each win the full bonus
-// purely from that shared first word, despite being a completely different food. Same class of problem
+// A bare query naming a specific, unambiguous cheese type (paneer, parmesan, ...) means the plain
+// cheese, but every US/UK-style "Cheese, <type>" entry names itself category-first, so its primary
+// segment is the generic word "cheese" and it gets no primary-match bonus at all — while an unrelated
+// product whose name merely happens to START with that type word (e.g. "Paneer, apple and pineapple
+// salad", "parmesan cheese topping, fat free") wins instead, purely from that shared first word, despite
+// being a completely different food. Deliberately limited to types that have exactly one everyday
+// meaning — unlike a bare "cheese" query itself, which genuinely is ambiguous across varieties and
+// should keep surfacing that (see the ambiguity test), so this must never apply to more than one
+// candidate signature per query or it would silently suppress that flag too. Same class of problem
 // BARE_PEPPER_SPICE_BONUS solves above, just inverted (the correct entry is category-first here, not
 // the wrong ones).
-const BARE_PANEER_BONUS = 0.6;
+const BARE_NAMED_CHEESE_WORDS = new Set([
+	'paneer',
+	'parmesan',
+	'cheddar',
+	'mozzarella',
+	'feta',
+	'ricotta',
+	'gouda',
+	'brie',
+	'provolone',
+	'gruyere',
+	'halloumi',
+	'mascarpone',
+	'camembert',
+	'gorgonzola',
+	'asiago',
+	'muenster',
+	'colby',
+]);
+const BARE_NAMED_CHEESE_BONUS = 0.6;
 const invertedIndex = new Map<string, number[]>(); // token -> entry indices
 
 for (let entryIndex = 0; entryIndex < INGREDIENTS.length; entryIndex++) {
@@ -526,12 +554,20 @@ export function matchIngredient(name: string, region?: RegionCode): IngredientMa
 			queryTokens.size === 1 && queryTokens.has('pepper') && nameTokens.has('black') && entryPrimaryCategory[entryIndex] === 'spices';
 		const isSkinOnlyPotato =
 			isPotatoSkinOnlyEntry(entryNameTokensOrdered[entryIndex]) && !queryTokens.has('skin') && !queryTokens.has('peel');
+		// A bare "spaghetti" query matched "Sauce, pasta, spaghetti/marinara, ready-to-serve" — a jarred
+		// tomato sauce, not the pasta — because the CATEGORY_PREFIX_DENYLIST redirect (needed so "soy
+		// sauce" finds real soy-sauce entries) also fires here, crediting this entry with a full
+		// primary-match bonus against the pasta-shape-word query injection above. A sauce/condiment
+		// should never outrank the actual food it's flavored after for a query that doesn't ask for a
+		// sauce at all.
+		const isUnwantedSauce = entryPrimaryCategory[entryIndex] === 'sauce' && !queryTokens.has('sauce');
 
 		const isOffType =
 			(hasCookedWord && !queryHasCookedWord) ||
 			(hasUncommonVariantWord && !isBarePepperBlackException && ![...queryTokens].some((t) => UNCOMMON_VARIANT_WORDS.has(t))) ||
 			(hasFlavorAdditiveWord && ![...queryTokens].some((t) => FLAVOR_ADDITIVE_WORDS.has(t))) ||
 			isSkinOnlyPotato ||
+			isUnwantedSauce ||
 			(hasProcessedFormWord && ![...queryTokens].some((t) => PROCESSED_FORM_WORDS.has(t))) ||
 			(hasNamedDishWord && ![...queryTokens].some((t) => NAMED_DISH_WORDS.has(t))) ||
 			(hasConcentrateWord && !queryHasConcentrateWord) ||
@@ -577,6 +613,9 @@ export function matchIngredient(name: string, region?: RegionCode): IngredientMa
 		if (isSkinOnlyPotato) {
 			rankScore -= SKIN_ONLY_PENALTY;
 		}
+		if (isUnwantedSauce) {
+			rankScore -= UNWANTED_SAUCE_PENALTY;
+		}
 		if (hasProcessedFormWord && ![...queryTokens].some((t) => PROCESSED_FORM_WORDS.has(t))) {
 			rankScore -= UNCOMMON_VARIANT_PENALTY;
 		}
@@ -593,8 +632,15 @@ export function matchIngredient(name: string, region?: RegionCode): IngredientMa
 		if (queryTokens.size === 1 && queryTokens.has('pepper') && entryPrimaryCategory[entryIndex] === 'spices') {
 			rankScore += BARE_PEPPER_SPICE_BONUS;
 		}
-		if (queryTokens.size === 1 && queryTokens.has('paneer') && entryPrimaryCategory[entryIndex] === 'cheese') {
-			rankScore += BARE_PANEER_BONUS;
+		// Not restricted to a single-word query (unlike the bare-pepper tiebreak above) — "grated
+		// parmesan"/"shredded cheddar" have the exact same category-first scoring gap as a bare
+		// "parmesan" query does, and requiring the queried type word to also appear in THIS entry's own
+		// name keeps the bonus from misfiring onto some other "Cheese, <different type>" entry.
+		if (entryPrimaryCategory[entryIndex] === 'cheese') {
+			const namedCheeseWord = [...queryTokens].find((t) => BARE_NAMED_CHEESE_WORDS.has(t));
+			if (namedCheeseWord && nameTokens.has(namedCheeseWord)) {
+				rankScore += BARE_NAMED_CHEESE_BONUS;
+			}
 		}
 		if (hasConcentrateWord && !queryHasConcentrateWord) {
 			rankScore -= CONCENTRATE_PENALTY;
