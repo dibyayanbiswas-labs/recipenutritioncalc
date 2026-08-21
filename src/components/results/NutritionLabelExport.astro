@@ -1,6 +1,7 @@
 ---
 import type { NutritionResult } from '../../lib/nutrients';
 import { MACRO_META, MICRO_META } from '../../lib/nutrientMeta';
+import { LOW_COVERAGE_NUTRIENT_KEYS } from '../../lib/nutrientMath';
 import type { NutrientProfile } from '../../lib/matchIngredient';
 
 interface Props {
@@ -39,7 +40,7 @@ const perServing = result.perServing;
 					class="flex justify-between text-caption py-0.5"
 					data-label-row
 					data-key={m.key}
-					hidden={(result.dailyValuePercent[m.key] ?? 0) <= 0}
+					hidden={(result.dailyValuePercent[m.key] ?? 0) <= 0 || LOW_COVERAGE_NUTRIENT_KEYS.has(m.key as keyof NutrientProfile)}
 				>
 					<span>{m.label}</span>
 					<span data-label-dv>{result.dailyValuePercent[m.key] ?? 0}% DV</span>
