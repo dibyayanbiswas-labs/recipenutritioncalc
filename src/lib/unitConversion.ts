@@ -46,6 +46,17 @@ function isOilEntry(entry: IngredientEntry): boolean {
 // separately carry its own avgUnitWeightG.
 const CAN_DEFAULT_WEIGHT_G = 400;
 
+// A line with genuinely no amount at all — not even a bare number — and no unit almost never means
+// "assume one full 100g produce-item serving": real recipes write ingredients this way almost
+// exclusively for a garnish/finishing touch ("Grated parmesan cheese", "Chopped walnuts, for topping",
+// a comma-separated garnish list like "Paprika, red pepper flakes, and/or fresh parsley") or a
+// seasoning, never a self-contained portion. `line.isOptionalOrToTaste` (see above) already zeroes
+// this out when the line says so explicitly ("to taste", "for garnish", ...), but real recipes omit an
+// amount on a garnish/topping line at least as often without using one of those specific phrases — this
+// catches that same pattern generally instead of chasing every possible wording one at a time, the same
+// way SEASONING_DEFAULT_G/OIL_DEFAULT_G above already do for their specific categories.
+const NO_QUANTITY_DEFAULT_G = 5;
+
 // Rough category densities (g per US cup, ~236.588mL), keyed by a substring of the ingredient's name —
 // checked in order, first match wins. Only consulted when neither the matched database entry nor an
 // AI estimate carries a precise gPerCup: without this, a volume measurement of anything but an actual
@@ -93,16 +104,19 @@ export function resolveGrams(line: ParsedIngredientLine, entry: IngredientEntry 
 	}
 
 	const unitDef = line.unit ? UNIT_TABLE[line.unit] ?? findByCanonical(line.unit) : null;
-	const genericCountWeight = entry && isSeasoningEntry(entry)
-		? SEASONING_DEFAULT_G
-		: entry && isOilEntry(entry)
-			? OIL_DEFAULT_G
-			: GENERIC_COUNT_WEIGHT_G;
+	const isSeasoning = !!entry && isSeasoningEntry(entry);
+	const isOil = !!entry && isOilEntry(entry);
+	const genericCountWeight = isSeasoning ? SEASONING_DEFAULT_G : isOil ? OIL_DEFAULT_G : GENERIC_COUNT_WEIGHT_G;
 
 	// No unit at all — treat as a count (e.g. "2 eggs", "1 onion").
 	if (!unitDef) {
 		if (entry?.avgUnitWeightG) {
 			return { grams: quantity * entry.avgUnitWeightG, conversionSource: 'ingredient-data' };
+		}
+		// Seasoning/oil already have their own tuned no-amount default above; anything else that named no
+		// quantity at all falls to the general small garnish/finishing default instead of a full 100g count.
+		if (line.quantity === null && !isSeasoning && !isOil) {
+			return { grams: NO_QUANTITY_DEFAULT_G, conversionSource: 'estimated' };
 		}
 		return { grams: quantity * genericCountWeight, conversionSource: 'estimated' };
 	}

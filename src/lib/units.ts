@@ -111,4 +111,10 @@ export const OPTIONAL_PHRASES = [
 	'for cooking',
 	'for drizzling',
 	'for dusting',
+	'for topping',
+	'for sprinkling',
+	'for seasoning',
+	'for finishing',
+	'to finish',
+	'to garnish',
 ];

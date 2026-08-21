@@ -207,6 +207,33 @@ const UNCOMMON_VARIANT_WORDS = new Set([
 	'kernel',
 	'coconut',
 ]);
+// A mix-in ingredient baked into a staple's name (spinach pasta, spinach egg noodles) makes a distinct
+// colored/flavored specialty product, not what a bare "spaghetti"/"pasta"/"noodles" query means — the
+// same problem UNCOMMON_VARIANT_WORDS solves for milk/oil source substitutions above, just for an
+// added-ingredient variant instead of a species/source one. Demoted only when the query doesn't
+// explicitly ask for it, same exemption as UNCOMMON_VARIANT_WORDS.
+const FLAVOR_ADDITIVE_WORDS = new Set(['spinach']);
+// Common pasta shape names that don't literally contain the word "pasta" — added as an implicit extra
+// query token (see matchIngredient) so a bare "spaghetti"/"macaroni"/... query reaches adequate
+// coverage against the database's generic "pasta, cooked, ..." entries (nutritionally representative
+// of any plain wheat pasta shape) instead of only ever matching whichever entry happens to spell the
+// shape word out in its name — which, for "spaghetti", is exclusively the spinach and
+// protein-fortified specialty variants, not a plain one.
+const PASTA_SHAPE_WORDS = new Set([
+	'spaghetti',
+	'macaroni',
+	'penne',
+	'fettuccine',
+	'linguine',
+	'rigatoni',
+	'fusilli',
+	'farfalle',
+	'vermicelli',
+	'rotini',
+	'ziti',
+	'tagliatelle',
+	'orzo',
+]);
 // Substitute-product words that need SUBSTITUTE_PRODUCT_PENALTY rather than UNCOMMON_VARIANT_PENALTY —
 // split out from the set above because these particular substitutes are disproportionately likely to
 // BE an entry's entire primary (pre-comma) segment ("bacon, meatless"; "mayonnaise, made with tofu";
@@ -415,6 +442,9 @@ export function matchIngredient(name: string, region?: RegionCode): IngredientMa
 	if (queryTokens.has('salt')) {
 		for (const w of SALT_DESCRIPTOR_WORDS) queryTokens.delete(w);
 	}
+	if (!queryTokens.has('pasta') && [...queryTokens].some((t) => PASTA_SHAPE_WORDS.has(t))) {
+		queryTokens.add('pasta');
+	}
 	if (queryTokens.size === 0) return null;
 
 	const queryHasCookedWord = [...queryTokens].some((t) => COOKED_STATE_WORDS.has(t));
@@ -450,6 +480,7 @@ export function matchIngredient(name: string, region?: RegionCode): IngredientMa
 		const hasCookedWord = [...nameTokens].some((t) => COOKED_STATE_WORDS.has(t));
 		const hasRawWord = nameTokens.has('raw');
 		const hasUncommonVariantWord = [...nameTokens].some((t) => UNCOMMON_VARIANT_WORDS.has(t));
+		const hasFlavorAdditiveWord = [...nameTokens].some((t) => FLAVOR_ADDITIVE_WORDS.has(t));
 		const hasProcessedFormWord = [...nameTokens].some((t) => PROCESSED_FORM_WORDS.has(t));
 		const hasNamedDishWord = [...nameTokens].some((t) => NAMED_DISH_WORDS.has(t));
 		const hasConcentrateWord = [...nameTokens].some((t) => CONCENTRATE_WORDS.has(t));
@@ -468,6 +499,7 @@ export function matchIngredient(name: string, region?: RegionCode): IngredientMa
 		const isOffType =
 			(hasCookedWord && !queryHasCookedWord) ||
 			(hasUncommonVariantWord && !isBarePepperBlackException && ![...queryTokens].some((t) => UNCOMMON_VARIANT_WORDS.has(t))) ||
+			(hasFlavorAdditiveWord && ![...queryTokens].some((t) => FLAVOR_ADDITIVE_WORDS.has(t))) ||
 			(hasProcessedFormWord && ![...queryTokens].some((t) => PROCESSED_FORM_WORDS.has(t))) ||
 			(hasNamedDishWord && ![...queryTokens].some((t) => NAMED_DISH_WORDS.has(t))) ||
 			(hasConcentrateWord && !queryHasConcentrateWord) ||
@@ -505,6 +537,9 @@ export function matchIngredient(name: string, region?: RegionCode): IngredientMa
 		if (hasCookedWord && queryHasCookedWord) rankScore += 0.1;
 		if (hasRawWord) rankScore += 0.02;
 		if (hasUncommonVariantWord && !isBarePepperBlackException && ![...queryTokens].some((t) => UNCOMMON_VARIANT_WORDS.has(t))) {
+			rankScore -= UNCOMMON_VARIANT_PENALTY;
+		}
+		if (hasFlavorAdditiveWord && ![...queryTokens].some((t) => FLAVOR_ADDITIVE_WORDS.has(t))) {
 			rankScore -= UNCOMMON_VARIANT_PENALTY;
 		}
 		if (hasProcessedFormWord && ![...queryTokens].some((t) => PROCESSED_FORM_WORDS.has(t))) {
