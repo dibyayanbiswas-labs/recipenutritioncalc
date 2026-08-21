@@ -180,9 +180,16 @@ function extractUnit(text: string): { unit: string | null; unitClass: UnitClass 
  * found no unit at all, and scoped to count-class units: those are the only ones naturally said this
  * way ("2 flour cups" isn't idiomatic, but "1 garlic clove" is extremely common) — without this, "1
  * garlic clove" fell through to a generic 100g count weight, ~30x the real ~3g of a single clove. */
+// A bare descriptor word is never itself a food name — "whole cloves"/"ground cloves" name the clove
+// SPICE itself (with "cloves" as the food, "whole"/"ground" only describing its form), not some
+// ingredient called "whole" measured in a trailing "cloves" unit. Without this, "4 whole cloves" parsed
+// as quantity=4, unit=clove, name="whole" — which then confidently matched "egg, whole, raw, fresh"
+// (654mg of phantom cholesterol from what should be a near-zero-nutrient spice).
+const NON_FOOD_TRAILING_UNIT_DESCRIPTORS = new Set(['whole', 'ground']);
 function extractTrailingCountUnit(text: string): { unit: string; rest: string } | null {
 	const match = text.match(new RegExp(`^(.+?)\\s+(${COUNT_UNIT_ALIAS_PATTERN})\\b\\.?\\s*$`, 'i'));
 	if (!match) return null;
+	if (NON_FOOD_TRAILING_UNIT_DESCRIPTORS.has(match[1].trim().toLowerCase())) return null;
 	const unitDef = UNIT_TABLE[match[2]] ?? UNIT_TABLE[match[2].toLowerCase()];
 	if (!unitDef) return null;
 	return { unit: unitDef.canonical, rest: match[1].trim() };
