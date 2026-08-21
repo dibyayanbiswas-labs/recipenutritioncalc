@@ -1,5 +1,6 @@
 ---
 import ThemeToggle from '../ui/ThemeToggle.astro';
+import InstallButton from '../ui/InstallButton.astro';
 ---
 
 <header class="sticky top-0 z-50 h-16 border-b border-hairline bg-canvas/85 backdrop-blur-md print:hidden">
@@ -23,6 +24,7 @@ import ThemeToggle from '../ui/ThemeToggle.astro';
 			<a href="/contact" class="rounded-full px-sm py-xs hover:text-ink hover:bg-canvas-soft">Contact</a>
 		</nav>
 		<div class="flex items-center gap-sm">
+			<InstallButton />
 			<ThemeToggle />
 		</div>
 	</div>

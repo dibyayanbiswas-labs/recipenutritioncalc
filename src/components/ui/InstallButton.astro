@@ -1,0 +1,56 @@
+---
+---
+
+<button
+	id="pwa-install-button"
+	type="button"
+	class="hidden items-center gap-xs rounded-full border border-hairline bg-canvas px-sm py-xs text-body-sm text-ink hover:bg-canvas-soft-2"
+>
+	<svg
+		xmlns="http://www.w3.org/2000/svg"
+		viewBox="0 0 24 24"
+		fill="none"
+		stroke="currentColor"
+		stroke-width="2"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+		class="size-4"
+		aria-hidden="true"
+	>
+		<path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
+	</svg>
+	Install app
+</button>
+
+<script is:inline>
+	(function () {
+		var btn = document.getElementById('pwa-install-button');
+		if (!btn) return;
+		var deferredPrompt = null;
+
+		window.addEventListener('beforeinstallprompt', function (event) {
+			// Chrome gates its own automatic install banner behind engagement heuristics
+			// (return visits / time on site), so this button is the reliable path to install.
+			event.preventDefault();
+			deferredPrompt = event;
+			btn.classList.remove('hidden');
+			btn.classList.add('inline-flex');
+		});
+
+		btn.addEventListener('click', function () {
+			if (!deferredPrompt) return;
+			deferredPrompt.prompt();
+			deferredPrompt.userChoice.finally(function () {
+				deferredPrompt = null;
+				btn.classList.add('hidden');
+				btn.classList.remove('inline-flex');
+			});
+		});
+
+		window.addEventListener('appinstalled', function () {
+			deferredPrompt = null;
+			btn.classList.add('hidden');
+			btn.classList.remove('inline-flex');
+		});
+	})();
+</script>
