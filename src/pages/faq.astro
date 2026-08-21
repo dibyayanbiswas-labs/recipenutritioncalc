@@ -28,6 +28,10 @@ const faqs = [
 		a: 'Each ingredient line is parsed for quantity, unit, and name, converted to grams, then matched against a USDA-derived nutrition database. Matched values are summed and divided across your servings. See how it works for the full breakdown of parsing, unit conversion, and matching.',
 	},
 	{
+		q: 'Does cooking change the nutrition numbers?',
+		a: 'Yes, in reality it can - heat degrades some vitamins and water-soluble nutrients leach into cooking liquid. We account for this when your ingredient line says "cooked", "boiled", "roasted", etc. by matching a USDA entry for that cooked state; if a line doesn\'t specify, we match whichever entry scores best, which is often raw. See how it works for more on raw vs. cooked matching.',
+	},
+	{
 		q: 'Can I take a picture of a recipe and get its nutrition?',
 		a: 'Yes - upload a photo of a printed or handwritten recipe and it\'s transcribed and parsed the same way as pasted text, then run through the same database matching and calculation.',
 	},

@@ -269,9 +269,10 @@ const appStructuredData = {
 				<h3 class="text-display-sm text-ink mb-xs">How ingredient matching works</h3>
 				<p class="text-body-md text-body">
 					Each line is parsed for quantity, unit, and ingredient name, then converted to a common weight - 					cups and tablespoons use ingredient-specific density where we have it, not a generic assumption.
-					The ingredient is then matched against a curated, USDA-derived database. A low-confidence match is
-					labeled on the line, and anything we can't match at all falls back to an AI estimate rather than
-					being silently skipped.
+					The ingredient is then matched against a curated, USDA-derived database, preferring an entry for
+					the stated prep (raw, cooked, boiled, roasted) since cooking changes a food's nutrient content. A
+					low-confidence match is labeled on the line, and anything we can't match at all falls back to an
+					AI estimate rather than being silently skipped.
 				</p>
 			</div>
 
