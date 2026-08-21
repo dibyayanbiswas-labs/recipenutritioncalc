@@ -1,6 +1,6 @@
 import { matchIngredient, type MatchConfidence, type NutrientProfile } from './matchIngredient';
 import { parseIngredients, type ParsedIngredientLine } from './parseIngredients';
-import { resolveGrams, type ConversionSource } from './unitConversion';
+import { resolveGrams, type AiCallBudget, type ConversionSource } from './unitConversion';
 import { unionAllergens } from './allergens';
 import { estimateNutritionWithAI, getCachedEstimate } from './aiEstimate';
 import {
@@ -60,7 +60,10 @@ export interface NutritionResult {
 
 /** Resolves each parsed ingredient line into a nutrient contribution, using the bundled ingredient database, with a Workers AI estimate as a last-resort fallback for lines that don't match anything at all. */
 export async function analyzeIngredientLines(lines: ParsedIngredientLine[], ai?: Ai, kv?: KVNamespace): Promise<IngredientResult[]> {
-	let aiCallsRemaining = MAX_AI_FALLBACK_CALLS;
+	// Shared between nutrition-estimate calls below and weight-estimate calls inside resolveGrams —
+	// both draw from the same per-request cap so a pathological input can't spawn 2x the intended
+	// number of AI calls just because it needs both kinds of estimate.
+	const budget: AiCallBudget = { calls: MAX_AI_FALLBACK_CALLS };
 
 	return Promise.all(
 		lines.map(async (line) => {
@@ -83,14 +86,14 @@ export async function analyzeIngredientLines(lines: ParsedIngredientLine[], ai?:
 				// Cache lookup is free (no Neurons spent) and doesn't touch the call budget below —
 				// only an actual model call does.
 				aiProfile = kv ? await getCachedEstimate(line.matchName, kv) : null;
-				if (!aiProfile && aiCallsRemaining > 0) {
-					aiCallsRemaining--;
+				if (!aiProfile && budget.calls > 0) {
+					budget.calls--;
 					aiProfile = await estimateNutritionWithAI(line.matchName, ai, kv);
 				}
 				if (aiProfile) matchConfidence = 'ai-estimated';
 			}
 
-			const { grams, conversionSource } = resolveGrams(line, entry);
+			const { grams, conversionSource } = await resolveGrams(line, entry, ai ? { ai, kv, budget } : undefined);
 			const nutrients = entry ? scaleProfile(entry.per100g, grams) : aiProfile ? scaleProfile(aiProfile, grams) : emptyProfile();
 
 			return {

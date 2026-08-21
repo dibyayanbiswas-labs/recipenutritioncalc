@@ -1,6 +1,21 @@
 import { UNIT_TABLE } from './units';
 import type { IngredientEntry } from './matchIngredient';
 import type { ParsedIngredientLine } from './parseIngredients';
+import { estimateGramsWithAI, getCachedWeightEstimate } from './weightEstimate';
+
+/** Shared per-request cap on AI-estimate calls (nutrition lookups and weight lookups both draw from
+ * this same counter) — see nutrients.ts, which owns and passes this down. Kept as a plain mutable
+ * object rather than a return value so both call sites can decrement it inline without threading a
+ * new value back up through every intermediate call. */
+export interface AiCallBudget {
+	calls: number;
+}
+
+export interface AiConversionContext {
+	ai: Ai;
+	kv?: KVNamespace;
+	budget: AiCallBudget;
+}
 
 export type ConversionSource = 'ingredient-data' | 'estimated';
 
@@ -95,8 +110,66 @@ function estimateGPerCupFromName(name: string): number | null {
 	return null;
 }
 
-/** Resolves a parsed quantity+unit (against a matched ingredient, if any) into a gram weight. */
-export function resolveGrams(line: ParsedIngredientLine, entry: IngredientEntry | null): GramResolution {
+// Same idea as CATEGORY_G_PER_CUP above, for the *count*-based fallback instead of the volume one —
+// a bare "2 rotis"/"1 banana" with no unit and no avgUnitWeightG on the matched entry used to fall
+// straight through to GENERIC_COUNT_WEIGHT_G (100g) regardless of what the food actually is. These
+// are widely-cited approximate reference weights for one typical whole piece/serving, not
+// database-precise, but far closer than treating a flatbread the same as a whole onion.
+const CATEGORY_AVG_UNIT_WEIGHT_G: { keywords: string[]; grams: number }[] = [
+	{ keywords: ['roti', 'chapati', 'phulka'], grams: 40 },
+	{ keywords: ['naan'], grams: 90 },
+	{ keywords: ['tortilla, corn', 'corn tortilla'], grams: 26 },
+	{ keywords: ['tortilla, flour', 'flour tortilla', 'tortilla'], grams: 45 },
+	{ keywords: ['pita'], grams: 60 },
+	{ keywords: ['slice of bread', 'bread, slice', 'bread'], grams: 30 },
+	{ keywords: ['banana'], grams: 118 },
+	{ keywords: ['apple'], grams: 182 },
+	{ keywords: ['lemon'], grams: 84 },
+	{ keywords: ['lime'], grams: 67 },
+	{ keywords: ['garlic clove', 'clove of garlic', 'clove garlic'], grams: 3 },
+	{ keywords: ['onion, small', 'small onion'], grams: 70 },
+	{ keywords: ['onion, large', 'large onion'], grams: 150 },
+	{ keywords: ['onion'], grams: 110 },
+	{ keywords: ['tomato'], grams: 123 },
+	{ keywords: ['potato'], grams: 173 },
+	{ keywords: ['carrot'], grams: 61 },
+];
+
+function estimateAvgUnitWeightFromName(name: string): number | null {
+	const lower = name.toLowerCase();
+	for (const { keywords, grams } of CATEGORY_AVG_UNIT_WEIGHT_G) {
+		if (keywords.some((k) => lower.includes(k))) return grams;
+	}
+	return null;
+}
+
+/** Tries the AI-estimate fallback for a gram weight (last resort, after real data and the category
+ * tables above have both missed), respecting the shared per-request call budget. Returns null on any
+ * failure or when no AI context/budget is available, so callers fall through to their existing
+ * generic default unchanged. */
+async function tryAiGramsEstimate(
+	ingredientName: string,
+	measureDescription: string,
+	aiContext: AiConversionContext | undefined,
+): Promise<number | null> {
+	if (!aiContext) return null;
+	// Cache lookup is free (no Neurons spent) and doesn't touch the call budget — only an actual model
+	// call does, checked and consumed after the cache miss below.
+	const cached = aiContext.kv ? await getCachedWeightEstimate(ingredientName, measureDescription, aiContext.kv) : null;
+	if (cached) return cached;
+	if (aiContext.budget.calls <= 0) return null;
+	aiContext.budget.calls--;
+	return estimateGramsWithAI(ingredientName, measureDescription, aiContext.ai, aiContext.kv);
+}
+
+/** Resolves a parsed quantity+unit (against a matched ingredient, if any) into a gram weight. When
+ * `aiContext` is given, a genuinely undetermined weight (no ingredient data, no category-table match)
+ * gets one last AI-estimate attempt before falling back to the flat generic default. */
+export async function resolveGrams(
+	line: ParsedIngredientLine,
+	entry: IngredientEntry | null,
+	aiContext?: AiConversionContext,
+): Promise<GramResolution> {
 	const quantity = line.quantity ?? (line.isOptionalOrToTaste ? 0 : 1);
 
 	if (line.isOptionalOrToTaste && line.quantity === null) {
@@ -107,6 +180,7 @@ export function resolveGrams(line: ParsedIngredientLine, entry: IngredientEntry 
 	const isSeasoning = !!entry && isSeasoningEntry(entry);
 	const isOil = !!entry && isOilEntry(entry);
 	const genericCountWeight = isSeasoning ? SEASONING_DEFAULT_G : isOil ? OIL_DEFAULT_G : GENERIC_COUNT_WEIGHT_G;
+	const ingredientNameForEstimate = entry?.name ?? line.matchName;
 
 	// No unit at all — treat as a count (e.g. "2 eggs", "1 onion").
 	if (!unitDef) {
@@ -117,6 +191,12 @@ export function resolveGrams(line: ParsedIngredientLine, entry: IngredientEntry 
 		// quantity at all falls to the general small garnish/finishing default instead of a full 100g count.
 		if (line.quantity === null && !isSeasoning && !isOil) {
 			return { grams: NO_QUANTITY_DEFAULT_G, conversionSource: 'estimated' };
+		}
+		if (!isSeasoning && !isOil) {
+			const categoryWeight = estimateAvgUnitWeightFromName(ingredientNameForEstimate);
+			if (categoryWeight) return { grams: quantity * categoryWeight, conversionSource: 'estimated' };
+			const aiWeight = await tryAiGramsEstimate(ingredientNameForEstimate, 'one typical whole piece or serving', aiContext);
+			if (aiWeight) return { grams: quantity * aiWeight, conversionSource: 'estimated' };
 		}
 		return { grams: quantity * genericCountWeight, conversionSource: 'estimated' };
 	}
@@ -130,9 +210,14 @@ export function resolveGrams(line: ParsedIngredientLine, entry: IngredientEntry 
 			const gPerMl = entry.gPerCup / 236.588;
 			return { grams: quantity * unitDef.toBase * gPerMl, conversionSource: 'ingredient-data' };
 		}
-		const categoryGPerCup = estimateGPerCupFromName(entry?.name ?? line.matchName);
+		const categoryGPerCup = estimateGPerCupFromName(ingredientNameForEstimate);
 		if (categoryGPerCup) {
 			const gPerMl = categoryGPerCup / 236.588;
+			return { grams: quantity * unitDef.toBase * gPerMl, conversionSource: 'estimated' };
+		}
+		const aiGPerCup = await tryAiGramsEstimate(ingredientNameForEstimate, '1 US cup (236.6 mL)', aiContext);
+		if (aiGPerCup) {
+			const gPerMl = aiGPerCup / 236.588;
 			return { grams: quantity * unitDef.toBase * gPerMl, conversionSource: 'estimated' };
 		}
 		return { grams: quantity * unitDef.toBase * WATER_G_PER_ML, conversionSource: 'estimated' };
@@ -145,6 +230,10 @@ export function resolveGrams(line: ParsedIngredientLine, entry: IngredientEntry 
 	if (unitDef.canonical === 'can') {
 		return { grams: quantity * CAN_DEFAULT_WEIGHT_G, conversionSource: 'estimated' };
 	}
+	const categoryWeight = estimateAvgUnitWeightFromName(ingredientNameForEstimate);
+	if (categoryWeight) return { grams: quantity * categoryWeight, conversionSource: 'estimated' };
+	const aiWeight = await tryAiGramsEstimate(ingredientNameForEstimate, `one ${unitDef.canonical}`, aiContext);
+	if (aiWeight) return { grams: quantity * aiWeight, conversionSource: 'estimated' };
 	return { grams: quantity * genericCountWeight, conversionSource: 'estimated' };
 }
 
