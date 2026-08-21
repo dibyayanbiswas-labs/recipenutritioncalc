@@ -1,6 +1,8 @@
 {
   "name": "RecipeNutritionCalculator",
   "short_name": "recipenutritioncalc",
+  "start_url": "/",
+  "scope": "/",
   "icons": [
     {
       "src": "/web-app-manifest-192x192.png",
