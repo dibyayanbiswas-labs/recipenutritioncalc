@@ -42,6 +42,8 @@ const { error = null, servingsError = null, value = '' } = Astro.props;
 		<Input id="url-servings" name="servingsOverride" type="number" placeholder="Auto-detected" />
 		{servingsError && <p class="text-body-sm text-error-deep mt-xxs">{servingsError}</p>}
 	</div>
+	<div id="url-turnstile"></div>
+
 	<div class="flex items-center gap-md">
 		<Button type="submit" id="url-submit-btn">Fetch &amp; calculate</Button>
 		<Button type="button" id="url-start-over" variant="secondary">Start over</Button>

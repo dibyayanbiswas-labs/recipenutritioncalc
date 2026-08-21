@@ -40,6 +40,8 @@ const tabs = [
 ] as const;
 ---
 
+<script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+
 <div>
 	<p class="pwa-connectivity-note text-caption text-mute mb-sm">
 		Using the installed app? Stay connected to the internet — recipe analysis needs it for accurate results.
@@ -90,6 +92,33 @@ const tabs = [
 		var container = document.getElementById('input-tabs');
 		if (!container) return;
 
+		// One Turnstile widget per form, rendered lazily the first time its tab becomes visible —
+		// rendering all four on page load would try to size widgets inside `hidden` (display:none)
+		// panels, which Turnstile can't do reliably. Kept in the same script that already owns tab
+		// switching so "tab becomes visible" has one place to hook into.
+		var TURNSTILE_SITE_KEY = '0x4AAAAAAEXt8noz7I2XHJGk';
+		var TURNSTILE_WIDGETS = {
+			paste: { container: 'paste-turnstile', action: 'paste_text' },
+			url: { container: 'url-turnstile', action: 'recipe_url' },
+			manual: { container: 'manual-turnstile', action: 'manual_entry' },
+			photo: { container: 'photo-turnstile', action: 'photo_upload' },
+		};
+		// Exposed so PhotoUploadForm's own script (which submits via fetch, not a native form POST)
+		// can read the token and reset the widget after each attempt.
+		window.__turnstileWidgetIds = window.__turnstileWidgetIds || {};
+
+		function renderTurnstileFor(tabId) {
+			if (window.__turnstileWidgetIds[tabId] !== undefined) return;
+			var cfg = TURNSTILE_WIDGETS[tabId];
+			var el = cfg && document.getElementById(cfg.container);
+			if (!cfg || !el || !window.turnstile) return;
+			window.__turnstileWidgetIds[tabId] = window.turnstile.render(el, {
+				sitekey: TURNSTILE_SITE_KEY,
+				action: cfg.action,
+				appearance: 'interaction-only',
+			});
+		}
+
 		function activate(tabId) {
 			container.querySelectorAll('[role="tab"]').forEach(function (btn) {
 				var isActive = btn.getAttribute('data-tab') === tabId;
@@ -104,6 +133,7 @@ const tabs = [
 			document.querySelectorAll('[data-tab-panel]').forEach(function (panel) {
 				panel.hidden = panel.getAttribute('data-tab-panel') !== tabId;
 			});
+			renderTurnstileFor(tabId);
 		}
 
 		container.querySelectorAll('[role="tab"]').forEach(function (btn) {
@@ -113,6 +143,20 @@ const tabs = [
 		});
 
 		window.activateInputTab = activate;
+
+		// The external Turnstile script is loaded `async`, so it can finish (or already be cached and
+		// finish near-instantly) before this inline script has even run — an `?onload=` callback isn't
+		// reliable here since it can fire before this script defines it. Poll instead: cheap, short-lived
+		// (the script is small and loads fast), and self-contained in the one place that already owns
+		// tab state.
+		(function waitForTurnstile() {
+			if (window.turnstile) {
+				var activeBtn = container.querySelector('[role="tab"][aria-selected="true"]');
+				renderTurnstileFor(activeBtn ? activeBtn.getAttribute('data-tab') : 'paste');
+				return;
+			}
+			setTimeout(waitForTurnstile, 100);
+		})();
 	})();
 </script>
 

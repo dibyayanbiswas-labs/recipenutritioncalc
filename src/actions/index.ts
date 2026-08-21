@@ -1,4 +1,4 @@
-import { defineAction, ActionError } from 'astro:actions';
+import { defineAction, ActionError, type ActionAPIContext } from 'astro:actions';
 import { z } from 'astro/zod';
 import { env } from 'cloudflare:workers';
 import { analyzeIngredientLines, analyzeRecipeText, buildNutritionResult } from '../lib/nutrients';
@@ -6,6 +6,7 @@ import { checkIngredientTextFormat, parseIngredientLine } from '../lib/parseIngr
 import { extractRecipeFromUrl } from '../lib/schemaOrgRecipe';
 import { generateResultId, saveResult } from '../lib/kv';
 import { transcribeIngredientImage } from '../lib/transcribeImage';
+import { TURNSTILE_ACTIONS, verifyTurnstileToken } from '../lib/turnstile';
 
 // A full-resolution mobile camera photo can be several MB — read into a Uint8Array and then spread into
 // a plain number array for the AI binding (see transcribeIngredientImage), that's easily enough to
@@ -14,6 +15,29 @@ import { transcribeIngredientImage } from '../lib/transcribeImage';
 // net for whatever gets here anyway — a non-JS client, or a resize that silently failed — returning a
 // clear error instead of risking an out-of-memory crash.
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+/** Verifies the Turnstile token attached to a form submission before its handler does any real
+ * work, throwing a FORBIDDEN ActionError on failure. Skipped in local dev (`astro dev`), where
+ * TURNSTILE_SECRET is never configured — see src/types/env.d.ts. */
+async function requireHuman(token: unknown, action: string, context: ActionAPIContext): Promise<void> {
+	if (import.meta.env.DEV) return;
+	const ok = await verifyTurnstileToken(token, env.TURNSTILE_SECRET, action, context.clientAddress);
+	if (!ok) {
+		throw new ActionError({ code: 'FORBIDDEN', message: 'Verification failed — please refresh the page and try again.' });
+	}
+}
+
+/** Throttles a single client's submissions across all 4 recipe-analysis actions (they share one
+ * budget — spreading a burst across paste/url/manual/photo shouldn't dodge the limit). Not run in
+ * local dev: there's only ever one client hitting `astro dev`, and the binding isn't worth wiring
+ * up for a single-developer loop. */
+async function requireUnderRateLimit(context: ActionAPIContext): Promise<void> {
+	if (import.meta.env.DEV) return;
+	const { success } = await env.SUBMIT_RATE_LIMITER.limit({ key: context.clientAddress });
+	if (!success) {
+		throw new ActionError({ code: 'TOO_MANY_REQUESTS', message: "You're submitting a bit fast — wait a moment and try again." });
+	}
+}
 
 export const server = {
 	analyzeText: defineAction({
@@ -25,8 +49,12 @@ export const server = {
 			text: z.preprocess((v) => v ?? '', z.string().min(1, 'Paste some ingredients first.')),
 			servings: z.coerce.number().min(1, 'Servings must be at least 1.').max(100, 'Servings can be at most 100.').default(1),
 			title: z.string().optional(),
+			'cf-turnstile-response': z.preprocess((v) => v ?? '', z.string()),
 		}),
-		handler: async ({ text, servings, title }) => {
+		handler: async ({ text, servings, title, 'cf-turnstile-response': turnstileToken }, context) => {
+			await requireUnderRateLimit(context);
+			await requireHuman(turnstileToken, TURNSTILE_ACTIONS.pasteText, context);
+
 			const formatCheck = checkIngredientTextFormat(text);
 			if (!formatCheck.ok && formatCheck.blocking) {
 				throw new ActionError({ code: 'BAD_REQUEST', message: formatCheck.reason ?? 'That format is hard to read.' });
@@ -58,8 +86,12 @@ export const server = {
 				.min(1, 'Servings must be at least 1.')
 				.max(100, 'Servings can be at most 100.')
 				.optional(),
+			'cf-turnstile-response': z.preprocess((v) => v ?? '', z.string()),
 		}),
-		handler: async ({ url, servingsOverride }) => {
+		handler: async ({ url, servingsOverride, 'cf-turnstile-response': turnstileToken }, context) => {
+			await requireUnderRateLimit(context);
+			await requireHuman(turnstileToken, TURNSTILE_ACTIONS.url, context);
+
 			const extracted = await extractRecipeFromUrl(url);
 			if (!extracted.ok) {
 				throw new ActionError({ code: 'BAD_REQUEST', message: extracted.reason });
@@ -100,8 +132,12 @@ export const server = {
 			quantity: z.array(z.string()),
 			unit: z.array(z.string()),
 			name: z.array(z.string()),
+			'cf-turnstile-response': z.preprocess((v) => v ?? '', z.string()),
 		}),
-		handler: async ({ title, servings, quantity, unit, name }) => {
+		handler: async ({ title, servings, quantity, unit, name, 'cf-turnstile-response': turnstileToken }, context) => {
+			await requireUnderRateLimit(context);
+			await requireHuman(turnstileToken, TURNSTILE_ACTIONS.manual, context);
+
 			const id = generateResultId();
 			const lines = name
 				.map((n, i) => ({ quantity: quantity[i] ?? '', unit: unit[i] ?? '', name: n }))
@@ -129,8 +165,12 @@ export const server = {
 		accept: 'form',
 		input: z.object({
 			image: z.instanceof(File),
+			'cf-turnstile-response': z.preprocess((v) => v ?? '', z.string()),
 		}),
-		handler: async ({ image }) => {
+		handler: async ({ image, 'cf-turnstile-response': turnstileToken }, context) => {
+			await requireUnderRateLimit(context);
+			await requireHuman(turnstileToken, TURNSTILE_ACTIONS.photo, context);
+
 			if (!image.type.startsWith('image/')) {
 				throw new ActionError({ code: 'BAD_REQUEST', message: 'Please upload an image file.' });
 			}

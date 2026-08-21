@@ -35,6 +35,7 @@ import Button from '../ui/Button.astro';
 		/>
 	</div>
 	<p id="photo-error" class="text-body-sm text-error-deep hidden"></p>
+	<div id="photo-turnstile"></div>
 	<div class="flex items-center gap-md">
 		<Button type="button" id="photo-submit">Transcribe photo</Button>
 		<Button type="button" id="photo-start-over" variant="secondary">Start over</Button>
@@ -47,6 +48,11 @@ import Button from '../ui/Button.astro';
 	declare global {
 		interface Window {
 			activateInputTab?: (tab: string) => void;
+			__turnstileWidgetIds?: Record<string, string>;
+			turnstile?: {
+				getResponse: (widgetId: string) => string;
+				reset: (widgetId: string) => void;
+			};
 		}
 	}
 
@@ -149,6 +155,8 @@ import Button from '../ui/Button.astro';
 			submitBtn.textContent = 'Reading photo…';
 			const formData = new FormData();
 			formData.set('image', prepared);
+			const widgetId = window.__turnstileWidgetIds?.photo;
+			formData.set('cf-turnstile-response', widgetId !== undefined ? window.turnstile?.getResponse(widgetId) ?? '' : '');
 			const { data, error } = await withTimeout(actions.transcribeImage(formData), RESPONSE_TIMEOUT_MS);
 
 			if (error) {
@@ -168,6 +176,11 @@ import Button from '../ui/Button.astro';
 			errorEl.textContent = "That's taking longer than expected. Check your connection and try again, or paste the ingredients instead.";
 			errorEl.classList.remove('hidden');
 		} finally {
+			// The token consumed above is single-use regardless of whether the request succeeded or
+			// failed — reset so a retry (or the next photo) gets a fresh one instead of silently
+			// failing verification with an already-spent token.
+			const widgetId = window.__turnstileWidgetIds?.photo;
+			if (widgetId !== undefined) window.turnstile?.reset(widgetId);
 			submitBtn.textContent = originalLabel;
 			submitBtn.removeAttribute('disabled');
 		}

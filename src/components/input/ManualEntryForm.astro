@@ -62,6 +62,8 @@ const { error = null, servingsError = null } = Astro.props;
 
 	{error && <p class="text-body-sm text-error-deep" id="manual-error">{error}</p>}
 
+	<div id="manual-turnstile"></div>
+
 	<div class="flex items-center gap-md">
 		<Button type="submit" id="manual-submit">Calculate nutrition</Button>
 		<Button type="button" id="manual-start-over" variant="secondary">Start over</Button>
